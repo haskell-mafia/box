@@ -57,14 +57,12 @@ data Query = Query {
 
 makeLenses ''Query
 
-
 demo :: [Box]
 demo = [
     Box (Group "ambiata" "lab") "statler" [] []
   , Box (Group "ambiata" "lab") "waldorf" [] []
   , Box (Group "ambiata" "worker") "gonzo" [] []
   ]
-
 
 qualifies :: Box -> Qualifier -> Bool
 qualifies b (Tag t) = any (== t) $ b ^.tags
@@ -73,9 +71,8 @@ qualifies b (Installed n c) = any (== n) $ (b ^. software) <&> (^. softwareName)
 satisfies :: Query -> Box -> Bool
 satisfies q b =
   q ^. queryGroup == b ^. group &&
-  q ^. queryName == b ^. name . to Just &&
---  all (qualifies b) (q ^. queryQualifiers)
-  True
+  all (== b ^. name) (q ^. queryName) &&
+  all (qualifies b) (q ^. queryQualifiers)
 
 query :: Query -> [Box] -> [Box]
 query q = filter (satisfies q)
