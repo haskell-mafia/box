@@ -24,6 +24,7 @@ library
 
   exposed-modules:
                        Box
+                       Box.Prelude
 
 executable             box
     ghc-options:       -Wall -threaded -O2
