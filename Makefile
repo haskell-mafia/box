@@ -2,7 +2,7 @@ MFLAGS = -s
 MAKEFLAGS = $(MFLAGS)
 SANDBOX = .cabal-sandbox
 
-.PHONY: test build deps repl
+.PHONY: test build deps repl repl-test
 
 default: repl
 
@@ -13,10 +13,13 @@ build: ${SANDBOX}
 	cabal configure  && cabal build
 
 test: ${SANDBOX}
-	cabal configure --enable-tests  && cabal build
+	cabal test
 
 deps: ${SANDBOX}
-	cabal install --only-dependencies
+	cabal install --only-dependencies --enable-tests
 
 repl: ${SANDBOX}
-	cabal configure --enable-tests && cabal repl
+	cabal repl
+
+repl-test: ${SANDBOX}
+	cabal repl test

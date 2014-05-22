@@ -25,9 +25,17 @@ library
   exposed-modules:
                        Box
                        Box.Prelude
+                       Box.Data
+                       Box.Query
 
 executable             box
     ghc-options:       -Wall -threaded -O2
     main-is:           ../src/main.hs
     hs-source-dirs:    dist
     build-depends:     base, box
+
+test-suite test
+  type:           exitcode-stdio-1.0
+  main-is:        main.hs
+  hs-source-dirs: test
+  build-depends:  base, QuickCheck, box
