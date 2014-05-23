@@ -22,4 +22,4 @@ repl: ${SANDBOX}
 	cabal repl
 
 repl-test: ${SANDBOX}
-	cabal repl test
+	cabal configure --enable-tests && cabal repl test

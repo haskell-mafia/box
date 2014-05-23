@@ -39,4 +39,5 @@ test-suite test
   type:           exitcode-stdio-1.0
   main-is:        test.hs
   hs-source-dirs: test
+
   build-depends:  base, QuickCheck, box, text

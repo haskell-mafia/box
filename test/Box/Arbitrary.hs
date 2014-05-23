@@ -8,8 +8,8 @@ import           Data.Text (Text)
 import           Data.Version
 import           Test.QuickCheck
 
-colours :: [Text]
-colours = [
+tag' :: [Text]
+tag' = [
     "red"
   , "blue"
   , "green"
@@ -21,8 +21,8 @@ colours = [
   , "white"
   ]
 
-muppets :: [Text]
-muppets = [
+name' :: [Text]
+name' = [
     "kermit"
   , "miss piggy"
   , "statler"
@@ -32,8 +32,8 @@ muppets = [
   , "fozzy"
   ]
 
-brands :: [Text]
-brands = [
+customer' :: [Text]
+customer' = [
     "dinoco"
   , "pizza-planet"
   , "als-toy-barn"
@@ -44,8 +44,8 @@ brands = [
   , "allinol"
   ]
 
-roles :: [Text]
-roles = [
+role' :: [Text]
+role' = [
     "lab"
   , "science"
   , "worker"
@@ -55,8 +55,8 @@ roles = [
   , "bakery"
   ]
 
-commands :: [Text]
-commands = [
+software' :: [Text]
+software' = [
     "ls"
   , "cat"
   , "wc"
@@ -79,12 +79,31 @@ instance Arbitrary Version where
 
 instance Arbitrary Group where
   arbitrary =
-    Group <$> elements brands <*> elements roles
+    Group <$> elements customer' <*> elements role'
 
 instance Arbitrary Software where
   arbitrary =
-    Software <$> elements commands <*> arbitrary
+    Software <$> elements software' <*> arbitrary
 
 instance Arbitrary Box where
   arbitrary =
-    Box <$> arbitrary <*> elements muppets <*> (listOf . elements) colours  <*> arbitrary
+    Box <$> arbitrary <*> elements name' <*> (listOf . elements) tag'  <*> arbitrary
+
+instance Arbitrary Qualifier where
+  arbitrary = frequency [
+      (4, Tag <$> elements tag')
+    , (1, Installed <$> elements software' <*> arbitrary)
+    ]
+
+instance Arbitrary Constraint where
+  arbitrary = oneof [
+      Eq <$> arbitrary
+    , Gt <$> arbitrary
+    , Lt <$> arbitrary
+    , arbitrary >>= \v -> pure $ Or (Gt v) (Eq v)
+    , arbitrary >>= \v -> pure $ Or (Lt v) (Eq v)
+    ]
+
+instance Arbitrary Query where
+  arbitrary =
+    Query <$> arbitrary <*> frequency [(1, Just <$> elements name'), (4, pure Nothing)] <*> arbitrary
