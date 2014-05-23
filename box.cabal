@@ -27,6 +27,7 @@ library
                        Box.Prelude
                        Box.Data
                        Box.Query
+                       Box.Parse
 
 executable             box
     ghc-options:       -Wall -threaded -O2
@@ -36,6 +37,6 @@ executable             box
 
 test-suite test
   type:           exitcode-stdio-1.0
-  main-is:        main.hs
+  main-is:        test.hs
   hs-source-dirs: test
-  build-depends:  base, QuickCheck, box
+  build-depends:  base, QuickCheck, box, text
