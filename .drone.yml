@@ -1,0 +1,7 @@
+image: agrafix/ghc7.6
+script:
+  - make test
+notify:
+  email:
+    recipients:
+      - mark.hibberd@ambiata.com
