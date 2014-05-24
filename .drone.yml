@@ -1,4 +1,7 @@
 image: agrafix/ghc7.6
+env:
+  - LANGUAGE="en_US:en"
+  - LANG="en_US.UTF-8"
 script:
   - cabal update
   - make deps
