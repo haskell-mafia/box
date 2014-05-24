@@ -1,5 +1,6 @@
 image: agrafix/ghc7.6
 script:
+  - cabal update
   - make deps
   - make test
 notify:
