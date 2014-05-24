@@ -1,5 +1,6 @@
 image: agrafix/ghc7.6
 script:
+  - make deps
   - make test
 notify:
   email:
