@@ -1,6 +1,7 @@
 image: agrafix/ghc7.6
 env:
-  - LANGUAGE="en_US:en"
+  - LANGUAGE="en_US.UTF-8"
+  - LC_ALL="en_US.UTF-8"
   - LANG="en_US.UTF-8"
 script:
   - cabal update
