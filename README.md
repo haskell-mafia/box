@@ -31,3 +31,4 @@ mechanisms.
 Other pre-req for full solution is bakery and tagging instances with
 software versions (via aws or other means), but a number of steps can
 be taken in before that.
+
