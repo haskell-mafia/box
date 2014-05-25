@@ -1,0 +1,6 @@
+#!/bin/sh -exu
+
+cabal update
+make deps
+make test
+
