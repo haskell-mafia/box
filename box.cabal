@@ -13,8 +13,9 @@ description:           box.
 library
   build-depends:
                        base                            >= 3          && < 5
-                     , text                            == 0.11.*
-                     , lens                            == 4.1.*
+                     , text                            == 1.1.*
+                     , lens                            == 4.4.*
+                     , optparse-applicative            == 0.11.*
 
   ghc-options:
                        -Wall
