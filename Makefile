@@ -1,6 +1,7 @@
 MFLAGS = -s
 MAKEFLAGS = $(MFLAGS)
 SANDBOX = .cabal-sandbox
+DEPS = .cabal-sandbox/.cairn
 
 .PHONY: test build deps repl repl-test
 
@@ -9,17 +10,25 @@ default: repl
 ${SANDBOX}:
 	cabal sandbox init
 
-build: ${SANDBOX}
+%.cabal:
+
+${DEPS}: ${SANDBOX} $(wildcard *.cabal)
+	cabal install --only-dependencies --enable-tests
+	cabal configure --enable-tests ${CABAL_FLAGS}
+	touch $@
+
+build: ${DEPS}
 	cabal configure  && cabal build
 
-test: ${SANDBOX}
+test: ${DEPS}
 	cabal test
 
-deps: ${SANDBOX}
-	cabal install --only-dependencies --enable-tests
-
-repl: ${SANDBOX}
+repl: ${DEPS}
 	cabal repl
 
-repl-test: ${SANDBOX}
-	cabal configure --enable-tests && cabal repl test
+repl-test: ${DEPS}
+	cabal repl test
+
+quick: ${DEPS}
+> ghci -package-db=$(wildcard ${SANDBOX}/*-packages.conf.d) -isrc -itest test/test.hs
+

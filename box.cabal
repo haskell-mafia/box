@@ -13,8 +13,8 @@ description:           box.
 library
   build-depends:
                        base                            >= 3          && < 5
-                     , text                            >= 0.11
-                     , lens                            >= 4.1
+                     , text                            == 0.11.*
+                     , lens                            == 4.1.*
 
   ghc-options:
                        -Wall
@@ -23,6 +23,7 @@ library
                        src
 
   exposed-modules:
+                       Paths_box
                        Box
                        Box.Prelude
                        Box.Data
@@ -31,8 +32,7 @@ library
 
 executable             box
     ghc-options:       -Wall -threaded -O2
-    main-is:           ../src/main.hs
-    hs-source-dirs:    dist
+    main-is:           main/box.hs
     build-depends:     base, box
 
 test-suite test
