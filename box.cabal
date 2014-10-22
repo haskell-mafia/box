@@ -48,4 +48,4 @@ test-suite spec
                         , base       == 4.*
                         , text       == 1.1.*
                         , QuickCheck == 2.7.6
-                        , hspec      >= 1.11.4
+                        , hspec      >= 1.12.1
