@@ -14,6 +14,7 @@ import           Data.Maybe as X hiding (fromJust)
 import           Data.Either as X
 import           Data.Traversable as X
 import           Data.Foldable as X
+import           Data.String as X
 import           Text.Show as X
 
 (?) :: a
