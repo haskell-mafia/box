@@ -1,6 +1,6 @@
 #!/bin/sh -exu
 
 cabal update
+cabal install cabal-install
 make deps
 make test
-
