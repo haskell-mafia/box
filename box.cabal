@@ -18,7 +18,7 @@ library
                      , attoparsec                      == 0.12.*
                      , optparse-applicative            == 0.11.*
                      , wreq                            == 0.2.0.*
-                     , aeson                           == 0.8.0.*
+                     , aeson                           == 0.7.0.*
                      , lens-aeson                      == 1.0.0.*
                      , containers                      == 0.5.5.*
 
