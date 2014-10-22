@@ -5,5 +5,4 @@ export PATH=.cabal-sandbox/bin:$PATH
 cabal update
 make deps
 make test
-cabal install hspec-discover
 make spec
