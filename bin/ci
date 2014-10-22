@@ -3,3 +3,4 @@ export LANG=en_US.UTF-8
 cabal update
 make deps
 make test
+make spec
