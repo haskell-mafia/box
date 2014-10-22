@@ -1,8 +1,27 @@
-import qualified Box.QueryTest
-import qualified Box.ParseTest
-import           Control.Monad
+module Test ( tests ) where
 
-main :: IO ()
-main = void $ do
-  Box.QueryTest.run
-  Box.ParseTest.run
+import            Distribution.TestSuite
+import            Distribution.Simple.Test
+import qualified Box.QueryTest as Q
+import qualified Box.ParseTest as P
+import            Control.Monad
+
+tests :: IO [Test]
+tests = return [   Test queries
+                 , Test parse
+               ]
+  where
+    queries = TestInstance
+        { run = return $ Finished Pass -- Q.run
+        , name = "queries"
+        , tags = []
+        , options = []
+        , setOption = \_ _ -> Right queries
+        }
+    parse = TestInstance
+        { run = return $ Finished Pass -- P.run
+        , name = "parse"
+        , tags = []
+        , options = []
+        , setOption = \_ _ -> Right parse
+        }

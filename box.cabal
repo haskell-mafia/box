@@ -4,19 +4,20 @@ license:               AllRightsReserved
 author:                Mark Hibberd <mark@hibberd.id.au>
 maintainer:            Mark Hibberd <mark@hibberd.id.au>
 copyright:             (c) 2014 Mark Hibberd
-synopsis:              bench
-category:              Console
+synopsis:              select a host from a given query
+category:              System.Console
 cabal-version:         >= 1.8
 build-type:            Simple
-description:           box.
+description:           box
 
 library
   build-depends:
-                       base                            >= 3          && < 5
+                       base                            == 4.*
                      , text                            == 1.1.*
                      , lens                            == 4.4.*
                      , attoparsec                      == 0.12.*
                      , optparse-applicative            == 0.11.*
+                     , wreq                            == 0.2.0.*
 
   ghc-options:
                        -Wall
@@ -33,13 +34,18 @@ library
                        Box.Parse
 
 executable             box
-    ghc-options:       -Wall -threaded -O2
+    ghc-options:      -Wall -threaded -O2
     main-is:           main/box.hs
-    build-depends:     base, box
+    build-depends:    base, box
 
-test-suite test
-  type:           exitcode-stdio-1.0
-  main-is:        test.hs
-  hs-source-dirs: test
-
-  build-depends:  base, QuickCheck, box, text
+test-suite spec
+  type:                exitcode-stdio-1.0
+  ghc-options:        -Wall -fno-warn-missing-signatures
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  other-modules:      Box.QuerySpec
+  build-depends:        box
+                        , base       == 4.*
+                        , text       == 1.1.*
+                        , QuickCheck == 2.7.6
+                        , hspec      >= 1.11.4

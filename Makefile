@@ -30,5 +30,7 @@ repl-test: ${DEPS}
 	cabal repl test
 
 quick: ${DEPS}
-> ghci -package-db=$(wildcard ${SANDBOX}/*-packages.conf.d) -isrc -itest test/test.hs
+	ghci -package-db=$(wildcard ${SANDBOX}/*-packages.conf.d) -isrc -itest test/test.hs
 
+spec: ${DEPS}
+	runhaskell -package-db=$(wildcard ${SANDBOX}/*-packages.conf.d) -isrc -itest test/Spec.hs
