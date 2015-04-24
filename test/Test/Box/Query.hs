@@ -25,4 +25,4 @@ prop_naive =
   query (Query lab Nothing []) boxes == [statler, waldorf]
 
 return []
-run = $quickCheckAll
+tests = $quickCheckAll

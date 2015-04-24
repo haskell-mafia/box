@@ -6,8 +6,7 @@ import           Test.QuickCheck
 import           Test.Box.Arbitrary ()
 
 prop_symmetricQuery :: Bool
-prop_symmetricQuery =
-  True
+prop_symmetricQuery = True
 
 return []
-run = $quickCheckAll
+tests = $quickCheckAll

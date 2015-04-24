@@ -46,10 +46,11 @@ test-suite test
   ghc-options:         -Wall -fno-warn-missing-signatures
   hs-source-dirs:      test
   main-is:             test.hs
-  other-modules:       Test.Box.QuerySpec
   build-depends:       base >= 3          && < 5
                        , box
                        , Cabal
                        , text       == 1.1.*
                        , QuickCheck == 2.7.6
                        , hspec      >= 1.12.1
+                     , p
+                     , orphanarium-core

@@ -1,8 +1,3 @@
 #!/bin/sh -exu
-export LANG=en_US.UTF-8
-export PATH=.cabal-sandbox/bin:$PATH
 
-cabal update
-make deps
-make test
-make spec
+$(dirname $0)/ci.branches

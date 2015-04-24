@@ -27,7 +27,7 @@ main =
        genBuildInfo (fromFlag $ replVerbosity flags) pd lbi
        (replHook hooks) pd lbi uh flags args
    , testHook = \args pd lbi uh flags -> do
-       genBuildInfo (fromFlag $ testVerbosity flags) pd lbi
+       genBuildInfo (fromFlag $ testVerbosity flags) pd lbi 
        (testHook hooks) args pd lbi uh flags
    }
 

@@ -1,23 +1,11 @@
-module Test ( tests ) where
+import           Orphanarium.Core.Main
 
-import           Distribution.TestSuite
+import qualified Test.Box.Parse
+import qualified Test.Box.Query
 
-tests :: IO [Test]
-tests = return [   Test queries
-                 , Test parse
-               ]
-  where
-    queries = TestInstance
-        { run = return $ Finished Pass -- Q.run
-        , name = "queries"
-        , tags = []
-        , options = []
-        , setOption = \_ _ -> Right queries
-        }
-    parse = TestInstance
-        { run = return $ Finished Pass -- P.run
-        , name = "parse"
-        , tags = []
-        , options = []
-        , setOption = \_ _ -> Right parse
-        }
+main :: IO ()
+main =
+  orphanariumMain [
+       Test.Box.Parse.tests
+    ,  Test.Box.Query.tests
+    ]
