@@ -1,10 +1,6 @@
 module Test ( tests ) where
 
-import            Distribution.TestSuite
-import            Distribution.Simple.Test
-import qualified Box.QueryTest as Q
-import qualified Box.ParseTest as P
-import            Control.Monad
+import           Distribution.TestSuite
 
 tests :: IO [Test]
 tests = return [   Test queries

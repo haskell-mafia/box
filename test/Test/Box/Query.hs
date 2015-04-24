@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Box.QueryTest where
+module Test.Box.Query where
 
 import           Test.QuickCheck
 import           Box.Data
@@ -24,4 +24,5 @@ prop_naive :: Bool
 prop_naive =
   query (Query lab Nothing []) boxes == [statler, waldorf]
 
+return []
 run = $quickCheckAll

@@ -1,15 +1,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Box.ParseTest where
+module Test.Box.Parse where
 
 import           Test.QuickCheck
-import           Box.Arbitrary
-import           Box.Data
-import           Box.Query
-import           Box.Parse
+import           Test.Box.Arbitrary ()
 
 prop_symmetricQuery :: Bool
 prop_symmetricQuery =
   True
 
+return []
 run = $quickCheckAll
