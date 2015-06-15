@@ -1,5 +1,5 @@
-lib/orphanarium/orphanarium-core
-lib/orphanarium/orphanarium-aeson
-lib/orphanarium/orphanarium-corpus
-lib/orphanarium/orphanarium-lens
+lib/disorder/disorder-core
+lib/disorder/disorder-aeson
+lib/disorder/disorder-corpus
+lib/disorder/disorder-lens
 lib/p
