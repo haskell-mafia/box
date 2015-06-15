@@ -1,0 +1,6 @@
+[submodule "lib/orphanarium"]
+	path = lib/orphanarium
+	url = git@github.com:ambiata/orphanarium.git
+[submodule "lib/p"]
+	path = lib/p
+	url = git@github.com:ambiata/p.git

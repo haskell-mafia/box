@@ -27,7 +27,7 @@ main = do
     Left m    -> putStrLn m
 
 eval :: Query -> IO [Box]
-eval qry = (?)
+eval _qry = (?)
 
 opts :: ParserInfo Args
 opts = info

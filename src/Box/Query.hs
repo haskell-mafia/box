@@ -45,7 +45,7 @@ makeLenses ''Query
 
 qualifies :: Box -> Qualifier -> Bool
 qualifies b (Tag t) = any (== t) $ b ^.tags
-qualifies b (Installed n c) = any (== n) $ (b ^. software) <&> (^. softwareName) -- FIX check version constraints
+qualifies b (Installed n _) = any (== n) $ (b ^. software) <&> (^. softwareName) -- FIX check version constraints
 
 satisfies :: Query -> Box -> Bool
 satisfies q b =

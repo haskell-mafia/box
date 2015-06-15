@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Box.Arbitrary where
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+module Test.Box.Arbitrary where
 
 import           Box.Data
 import           Box.Query
