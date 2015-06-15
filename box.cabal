@@ -47,10 +47,9 @@ test-suite test
   hs-source-dirs:      test
   main-is:             test.hs
   build-depends:       base >= 3          && < 5
-                       , box
-                       , Cabal
-                       , text       == 1.1.*
-                       , QuickCheck == 2.7.6
-                       , hspec      >= 1.12.1
+                     , box
+                     , Cabal
+                     , text       == 1.1.*
+                     , QuickCheck == 2.7.6
                      , p
-                     , orphanarium-core
+                     , disorder-core
