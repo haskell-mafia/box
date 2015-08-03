@@ -18,6 +18,14 @@ import           System.Exit
 
 import           X.Options.Applicative
 
+data HostType =
+    ExternalHost
+  | InternalHost
+  deriving (Eq, Show)
+
+data BoxQuery =
+  BoxQuery HostType Query
+  deriving (Eq, Show)
 
 main :: IO ()
 main = do
@@ -27,20 +35,32 @@ main = do
     case sc of
       VersionCommand ->
         getProgName >>= \prog -> (putStrLn $ prog <> ": " <> buildInfoVersion) >> exitSuccess
-      RunCommand _ query' -> do
+      RunCommand _ (BoxQuery ht query') -> do
         unless (queryHasMatch query')
           $ hPutStrLn stderr "No filter specified" >> exitFailure
         bs <- storeEnv
         b <- orDie boxErrorRender . EitherT . runS3WithDefaults $ queryBoxes query' bs
-        selectRandomHost b >>= \case
+        selectRandomBox b >>= \case
           Nothing ->
             exitFailure
-          Just (Host h) ->
-            putStrLn (T.unpack h) >> exitSuccess
+          Just b' ->
+            putStrLn (T.unpack . unHost . selectHost ht $ b') >> exitSuccess
 
-boxP :: Parser (SafeCommand Query)
+selectHost :: HostType -> Box -> Host
+selectHost InternalHost =
+  boxHost
+selectHost ExternalHost =
+  boxPublicHost
+
+boxP :: Parser (SafeCommand BoxQuery)
 boxP =
-  safeCommand queryP
+  safeCommand (BoxQuery <$> hostTypeP <*> queryP)
+
+hostTypeP :: Parser HostType
+hostTypeP =
+  flag InternalHost ExternalHost $
+       long "external"
+    <> help "Display the external ip address rather than the internal one (which is the default)."
 
 queryP :: Parser Query
 queryP = Query

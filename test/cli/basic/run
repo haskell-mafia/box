@@ -2,7 +2,7 @@
 
 BOX=${1:-./dist/build/box/box}
 
-export BOX_STORE=test/cli/basic/v1
+export BOX_STORE=test/cli/basic/v2
 
 $BOX -v
 
@@ -14,6 +14,8 @@ $BOX --name "mincom.*"
 $BOX --instance "i-a057m17c"
 $BOX --client "acme"
 $BOX --flavour "lab"
+$BOX --external --flavour "lab"
+$BOX --external --instance "i-a057m17c"
 $BOX --name "mincom.*" --instance "i-932db44b"
 $BOX --name "mincom.*" --instance "i-932db44b" --client "mincom"
 $BOX --name "mincom.*" --instance "i-932db44b" --client "mincom" --flavour "land"

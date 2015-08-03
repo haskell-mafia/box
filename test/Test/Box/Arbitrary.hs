@@ -20,13 +20,14 @@ data BoxResult =
 
 instance Arbitrary BoxResult where
   arbitrary = do
-    b@(Box i _ n c f) <- arbitrary
+    b@(Box i _ _ n c f) <- arbitrary
     q <- Query <$> genMatch (pure i) <*> genMatch (pure n) <*> genMatch (pure c) <*> genMatch (pure f)
     pure $ BoxResult b q
 
 instance Arbitrary Box where
   arbitrary = Box
     <$> arbitrary
+    <*> arbitrary
     <*> arbitrary
     <*> arbitrary
     <*> arbitrary

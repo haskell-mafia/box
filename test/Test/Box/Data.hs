@@ -18,8 +18,8 @@ import           Test.QuickCheck
 prop_parse_tripping = tripping boxToText boxFromText
 prop_parse_all_tripping = tripping boxesToText boxesFromText
 
-prop_select_host b bs = testIO . fmap isJust . selectRandomHost $ b : bs
-prop_select_host_none = testIO . fmap isNothing . selectRandomHost $ []
+prop_select_host b bs = testIO . fmap isJust . selectRandomBox $ b : bs
+prop_select_host_none = testIO . fmap isNothing . selectRandomBox $ []
 
 
 return []

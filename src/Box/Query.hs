@@ -21,7 +21,7 @@ query q =
   L.filter (match q)
 
 match :: Query -> Box -> Bool
-match (Query qi qn qc qf) (Box bi _ bn bc bf) =
+match (Query qi qn qc qf) (Box bi _ _ bn bc bf) =
      matchText unName bn qn
   && matchText unInstanceId bi qi
   && matchText unClient bc qc
