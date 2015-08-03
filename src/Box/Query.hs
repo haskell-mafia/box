@@ -1,57 +1,34 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 module Box.Query (
-    Qualifier (..)
-  , Constraint (..)
-  , Query (..)
-  , queryGroup
-  , queryName
-  , queryQualifiers
-  , qualifies
-  , satisfies
-  , query
+    query
+  , match
+  , matchText
   ) where
 
-import           Box.Prelude
 import           Box.Data
 
-import           Control.Lens
-import           Data.List (filter)
-import           Data.Text (Text)
-import           Data.Version
+import           Data.List as L (filter)
+import           Data.Text as T
 
--- FIX add "LATEST" and other date related qualifiers
-data Qualifier =
-    Tag Text
-  | Installed Text Constraint
-  deriving (Eq, Show)
+import           P
 
-data Constraint =
-    Eq Version
-  | Gt Version
-  | Lt Version
-  | And Constraint Constraint
-  | Or Constraint Constraint
-  deriving (Eq, Show)
+import qualified System.FilePath.Glob as G
 
-data Query = Query {
-    _queryGroup :: Group
-  , _queryName :: Maybe Text
-  , _queryQualifiers :: [Qualifier]
-  } deriving (Eq, Show)
-
-makeLenses ''Query
-
-qualifies :: Box -> Qualifier -> Bool
-qualifies b (Tag t) = any (== t) $ b ^.tags
-qualifies b (Installed n _) = any (== n) $ (b ^. software) <&> (^. softwareName) -- FIX check version constraints
-
-satisfies :: Query -> Box -> Bool
-satisfies q b =
-  q ^. queryGroup == b ^. group &&
-  all (== b ^. name) (q ^. queryName) &&
-  all (qualifies b) (q ^. queryQualifiers)
 
 query :: Query -> [Box] -> [Box]
-query q = filter (satisfies q)
+query q =
+  L.filter (match q)
+
+match :: Query -> Box -> Bool
+match (Query qi qn qc qf) (Box bi _ bn bc bf) =
+     matchText unName bn qn
+  && matchText unInstanceId bi qi
+  && matchText unClient bc qc
+  && matchText unFlavour bf qf
+
+matchText :: (a -> Text) -> a -> Match a -> Bool
+matchText _ _ MatchAll =
+  True
+matchText un a (Match mq) =
+  flip G.match (T.unpack $ un a) . G.compile . T.unpack . un $ mq

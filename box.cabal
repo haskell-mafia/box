@@ -7,20 +7,21 @@ copyright:             (c) 2014 Mark Hibberd
 synopsis:              select a host from a given query
 category:              System.Console
 cabal-version:         >= 1.8
-build-type:            Simple
+build-type:            Custom
 description:           box
 
 library
   build-depends:
-                       base                            == 4.*
-                     , text                            == 1.1.*
-                     , lens                            == 4.4.*
+                       base                            >= 3          && < 5
                      , attoparsec                      == 0.12.*
-                     , optparse-applicative            == 0.11.*
-                     , wreq                            == 0.2.0.*
-                     , aeson                           == 0.7.0.*
-                     , lens-aeson                      == 1.0.0.*
-                     , containers                      == 0.5.5.*
+                     , directory                       == 1.2.*
+                     , either                          == 4.3.*
+                     , Glob                            == 0.7.*
+                     , mismi-s3
+                     , p
+                     , random-shuffle                  == 0.0.4
+                     , transformers                    >= 0.3        && < 0.5
+                     , text                            == 1.2.*
 
   ghc-options:
                        -Wall
@@ -31,25 +32,50 @@ library
   exposed-modules:
                        Paths_box
                        Box
-                       Box.Prelude
                        Box.Data
                        Box.Query
-                       Box.Parse
+                       Box.Store
+
 
 executable             box
     ghc-options:      -Wall -threaded -O2
     main-is:           main/box.hs
-    build-depends:    base, box
+    build-depends:     base
+                     , box
+                     , either
+                     , mismi-s3
+                     , optparse-applicative            == 0.11.*
+                     , p
+                     , text
+                     , x-optparse
 
 test-suite test
   type:                exitcode-stdio-1.0
   ghc-options:         -Wall -fno-warn-missing-signatures
   hs-source-dirs:      test
   main-is:             test.hs
-  build-depends:       base >= 3          && < 5
+  build-depends:       base
                      , box
-                     , Cabal
-                     , text       == 1.1.*
-                     , QuickCheck == 2.7.6
-                     , p
                      , disorder-core
+                     , disorder-corpus
+                     , p
+                     , QuickCheck                      == 2.7.*
+                     , quickcheck-instances            == 0.3.*
+                     , text
+
+test-suite test-io
+  type:                exitcode-stdio-1.0
+  ghc-options:         -Wall -fno-warn-missing-signatures
+  hs-source-dirs:      test
+  main-is:             test-io.hs
+  build-depends:       base
+                     , box
+                     , disorder-core
+                     , disorder-corpus
+                     , p
+                     , mismi-s3
+                     , mismi-s3-test
+                     , QuickCheck                      == 2.7.*
+                     , quickcheck-instances            == 0.3.*
+                     , temporary                       == 1.2.*
+                     , text

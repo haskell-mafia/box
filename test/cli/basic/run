@@ -1,0 +1,23 @@
+#!/bin/sh -eu
+
+BOX=${1:-./dist/build/box/box}
+
+export BOX_STORE=test/cli/basic/v1
+
+$BOX -v
+
+$BOX --version
+
+if $BOX --name "mincom"; then exit 1; fi
+if $BOX; then exit 1; fi
+$BOX --name "mincom.*"
+$BOX --instance "i-a057m17c"
+$BOX --client "acme"
+$BOX --flavour "lab"
+$BOX --name "mincom.*" --instance "i-932db44b"
+$BOX --name "mincom.*" --instance "i-932db44b" --client "mincom"
+$BOX --name "mincom.*" --instance "i-932db44b" --client "mincom" --flavour "land"
+if $BOX --name "acme.*" --instance "i-932db44b" --client "mincom" --flavour "land"; then exit 1; fi
+if $BOX --name "mincom.*" --instance "i-932db44c" --client "mincom" --flavour "land"; then exit 1; fi
+if $BOX --name "mincom.*" --instance "i-932db44b" --client "acme" --flavour "land"; then exit 1; fi
+if $BOX --name "mincom.*" --instance "i-932db44b" --client "mincom" --flavour "hub"; then exit 1; fi
