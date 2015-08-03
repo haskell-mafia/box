@@ -1,28 +1,28 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Test.Box.Query where
 
-import           Test.QuickCheck
-import           Box.Data
 import           Box.Query
 
-lab = Group "ambiata" "lab"
-worker = Group "ambiata" "worker"
+import           P
 
-statler = Box lab "statler" [] []
-waldorf = Box lab "statler" [] []
-gonzo = Box worker  "gonzo" [] []
+import           Test.Box.Arbitrary
+import           Test.QuickCheck
+import           Test.QuickCheck.Instances ()
 
-boxes :: [Box]
-boxes = [
-    statler
-  , waldorf
-  , gonzo
-  ]
 
-prop_naive :: Bool
-prop_naive =
-  query (Query lab Nothing []) boxes == [statler, waldorf]
+prop_query (BoxResult b q) bs =
+  elem b $ query q (b : bs)
+
+prop_match_none b q bs =
+  not (match q b) ==>
+  not . elem b $ query q (b : bs)
+
+prop_match (BoxResult b q) =
+  match q b
+
 
 return []
 tests = $quickCheckAll

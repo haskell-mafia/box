@@ -1,43 +1,16 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-module Box where
+module Box (
+    module X
+  , queryBoxes
+  ) where
 
-import           Box.Data
-import           Box.Parse
-import           Box.Prelude
-import           Box.Query
+import           Box.Data as X
+import           Box.Query as X
+import           Box.Store as X
 
-import           Data.List (head)
-import           Data.Text (Text, pack)
-
-import           Options.Applicative
-
-import           System.IO
+import           P
 
 
-main :: IO ()
-main = do
-  args <- execParser opts
-  case (parseQuery (queryText args)) of
-    Right qry -> do
-      results <- eval qry
-      -- TODO Fail if singleMatch is true and list is empty
-      let boxes = if singleMatch args then [head results] else results
-      mapM_ print boxes
-
-    Left m    -> putStrLn m
-
-eval :: Query -> IO [Box]
-eval _qry = (?)
-
-opts :: ParserInfo Args
-opts = info
-  (Args <$>
-    (switch (short 'x' <> long "single" <> help "Whether to select the first box (ie. for ssh)")) <*>
-    (pack <$> argument str (metavar "QUERY" <> help "The query to run"))
-    )
-  (fullDesc <> progDesc "Find the ip address of a known box" <> header "box")
-
-data Args = Args {
-    singleMatch :: Bool
-  , queryText   :: Text
-  }
+queryBoxes :: Query -> BoxStore -> S3Action (Either BoxError [Box])
+queryBoxes q =
+  fmap (second (query q)) . readBoxes

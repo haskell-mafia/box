@@ -4,3 +4,12 @@
 [submodule "lib/disorder"]
 	path = lib/disorder
 	url = git@github.com:ambiata/disorder.hs
+[submodule "lib/x"]
+	path = lib/x
+	url = git@github.com:ambiata/x.git
+[submodule "lib/mismi"]
+	path = lib/mismi
+	url = git@github.com:ambiata/mismi.git
+[submodule "lib/amazonka"]
+	path = lib/amazonka
+	url = git@github.com:ambiata/amazonka.git
