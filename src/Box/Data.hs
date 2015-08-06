@@ -20,7 +20,7 @@ module Box.Data (
   , boxToText
   , boxParser
   , boxErrorRender
-  , selectRandomHost
+  , selectRandomBox
   ) where
 
 import           Data.Attoparsec.Text as AP
@@ -38,6 +38,7 @@ data Box =
   Box {
       boxInstance :: InstanceId
     , boxHost :: Host
+    , boxPublicHost :: Host
     , boxName :: Name
     , boxClient :: Client
     , boxFlavour :: Flavour
@@ -114,8 +115,8 @@ boxesToText bs =
   (<> "\n") . T.intercalate "\n" . fmap boxToText $ bs
 
 boxToText :: Box -> Text
-boxToText (Box (InstanceId i) (Host h) (Name n) (Client c) (Flavour f)) =
-  T.intercalate " " [i, h, n, c, f]
+boxToText (Box (InstanceId i) (Host h) (Host p) (Name n) (Client c) (Flavour f)) =
+  T.intercalate " " [i, h, p, n, c, f]
 
 boxParser :: Parser Box
 boxParser = do
@@ -123,11 +124,12 @@ boxParser = do
       ts = t <* string " "
   i <- InstanceId <$> ts
   h <- Host <$> ts
+  p <- Host <$> ts
   n <- Name <$> ts
   c <- Client <$> ts
   f <- Flavour <$> t
   endOfInput
-  pure $ Box i h n c f
+  pure $ Box i h p n c f
 
 boxStoreRender :: BoxStore -> Text
 boxStoreRender (BoxStoreLocal f) =
@@ -141,7 +143,7 @@ boxErrorRender (BoxNotFound bs) =
 boxErrorRender (BoxParseError e) =
   "Error parsing box file with the following error: " <> e
 
--- | Select a host at random so that the first box isn't the list isn't always picked again and again
-selectRandomHost :: [Box] -> IO (Maybe Host)
-selectRandomHost =
-  fmap (fmap boxHost . listToMaybe) . shuffleM
+-- | Select a box at random so that the first box isn't the list isn't always picked again and again
+selectRandomBox :: [Box] -> IO (Maybe Box)
+selectRandomBox =
+  fmap listToMaybe . shuffleM

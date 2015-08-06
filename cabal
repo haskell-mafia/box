@@ -69,7 +69,7 @@ initialize () {
 
     UNINITIALIZED=$(cd "$PROJECT_ROOT" && git submodule | grep "^-" | cut -d ' ' -f 2)
     for submodule in $UNINITIALIZED; do
-        $(cd "$PROJECT_ROOT" && git submodule update --init $submodule) || exit $?
+        (cd "$PROJECT_ROOT" && git submodule update --init $submodule) || exit $?
     done
 
     # if there is an explicit submodules file, then use it (hysterical

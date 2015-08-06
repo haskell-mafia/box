@@ -79,3 +79,12 @@ test-suite test-io
                      , quickcheck-instances            == 0.3.*
                      , temporary                       == 1.2.*
                      , text
+
+test-suite test-cli
+  type:                exitcode-stdio-1.0
+  ghc-options:         -Wall -fno-warn-missing-signatures
+  hs-source-dirs:      test
+  main-is:             test-cli.hs
+  build-depends:       base
+                     , box
+                     , disorder-core
