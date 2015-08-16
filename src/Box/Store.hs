@@ -36,4 +36,4 @@ writeBoxes bs (BoxStoreS3 a) =
 
 boxStoreAddress :: Address
 boxStoreAddress =
-  Address (Bucket "ambiata-dispensary") (Key "box/v1")
+  Address (Bucket "ambiata-dispensary") (Key "box/v2")
