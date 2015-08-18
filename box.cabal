@@ -16,7 +16,6 @@ library
                      , attoparsec                      == 0.12.*
                      , directory                       == 1.2.*
                      , either                          == 4.3.*
-                     , Glob                            == 0.7.*
                      , mismi-s3
                      , p
                      , random-shuffle                  == 0.0.4
@@ -41,6 +40,7 @@ executable             box
     ghc-options:      -Wall -threaded -O2
     main-is:           main/box.hs
     build-depends:     base
+                     , attoparsec                      == 0.12.*
                      , box
                      , either
                      , mismi-s3

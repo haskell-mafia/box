@@ -10,24 +10,24 @@ $BOX -v
 
 $BOX --version
 
-if $BOX ip --name "mincom"; then exit 1; fi
+if $BOX ip ::nomatches; then exit 1; fi
 if $BOX; then exit 1; fi
-$BOX ip --name "mincom.*"
-$BOX ip --instance "i-a057m17c"
-$BOX ip --client "acme"
-$BOX ip --flavour "lab"
-$BOX ip --external --flavour "lab"
-$BOX ip --external --instance "i-a057m17c"
-$BOX ip --name "mincom.*" --instance "i-932db44b"
-$BOX ip --name "mincom.*" --instance "i-932db44b" --client "mincom"
-$BOX ip --name "mincom.*" --instance "i-932db44b" --client "mincom" --flavour "land"
-if $BOX ip --name "acme.*" --instance "i-932db44b" --client "mincom" --flavour "land"; then exit 1; fi
-if $BOX ip --name "mincom.*" --instance "i-932db44c" --client "mincom" --flavour "land"; then exit 1; fi
-if $BOX ip --name "mincom.*" --instance "i-932db44b" --client "acme" --flavour "land"; then exit 1; fi
-if $BOX ip --name "mincom.*" --instance "i-932db44b" --client "mincom" --flavour "hub"; then exit 1; fi
+$BOX ip mincom
+$BOX ip acme
+$BOX ip :lab
+$BOX ip --external :lab
+$BOX ip mincom:land
+$BOX ip mincom:land:zoot
+$BOX ip mincom:land:zoot.golden
+$BOX ip mincom:land:golden
+$BOX ip ::zoot.golden
+if $BOX ip acme:land; then exit 1; fi
+if $BOX ip mincom:land:brown; then exit 1; fi
+if $BOX ip mincom:land:kermit; then exit 1; fi
+if $BOX ip mincom:hub; then exit 1; fi
 
 EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' '$BOX_USER'@54.1.1.6 nc %h %p 2>/dev/null","-o","HostKeyAlias=box.acme.lab.kermit.brown.717.jump","'$BOX_USER'@192.31.14.3"]'
-ACTUAL=$($BOX --dry-run ssh --client "acme" --flavour "lab")
+ACTUAL=$($BOX --dry-run ssh acme:lab)
 
 if [ "$EXPECT" != "$ACTUAL" ]; then
   echo "expected: $EXPECT"

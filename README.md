@@ -18,8 +18,8 @@ As examples of things I would like to be able to do:
 Where `barney` is an example customer.
 
 ```
-ssh $(box barney:live:kermit.green)  # ssh into the barney live  box named kermit.green box
-ssh $(box barney:live)               # ssh into any available barney live box
+box ssh barney:live:kermit.green  # ssh into the barney live  box named kermit.green box
+box ssh barney:live               # ssh into any available barney live box
 ```
 
 

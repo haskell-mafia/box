@@ -74,7 +74,7 @@ boxIP _ q hostType boxes = do
 
 boxSSH :: RunType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
 boxSSH runType qTarget args boxes = do
-  let qGateway = Query MatchAll MatchAll MatchAll (Match (Flavour "gateway"))
+  let qGateway = Query ExactAll (Exact (Flavour "gateway")) InfixAll
 
   t <- randomBoxOfQuery qTarget  boxes
   g <- randomBoxOfQuery qGateway boxes
@@ -178,47 +178,10 @@ hostTypeP =
     <> help "Display the external ip address rather than the internal one (which is the default)."
 
 queryP :: Parser Query
-queryP = Query
-  <$> matchParser instanceIdP
-  <*> matchParser nameP
-  <*> matchParser clientP
-  <*> matchParser flavourP
-
-nameP :: Parser Name
-nameP =
-  fmap Name . option textRead $
-       long "name"
-    <> short 'n'
-    <> metavar "NAME_FILTER"
-    <> help "Filter by the instance name"
-
-instanceIdP :: Parser InstanceId
-instanceIdP =
-  fmap InstanceId . option textRead $
-       long "instance"
-    <> short 'i'
-    <> metavar "INSTANCE_FILTER"
-    <> help "Filter by the instance ID"
-
-clientP :: Parser Client
-clientP =
-  fmap Client . option textRead $
-       long "client"
-    <> short 'c'
-    <> metavar "CLIENT_FILTER"
-    <> help "Filter by the instance client"
-
-flavourP :: Parser Flavour
-flavourP =
-  fmap Flavour . option textRead $
-       long "flavour"
-    <> short 'f'
-    <> metavar "FLAVOUR_FILTER"
-    <> help "Filter by the instance flavour"
-
-matchParser :: Parser a -> Parser (Match a)
-matchParser =
-  fmap (maybe MatchAll Match) . optional
+queryP =
+  argument (pOption queryParser) $
+       metavar "FILTER"
+    <> help "Filter using the following syntax: CLIENT[:FLAVOUR[:NAME]]"
 
 sshArgP :: Parser SSHArg
 sshArgP =
