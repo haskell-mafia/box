@@ -47,6 +47,8 @@ executable             box
                      , optparse-applicative            == 0.11.*
                      , p
                      , text
+                     , transformers                    >= 0.3        && < 0.5
+                     , unix                            == 2.7.*
                      , x-optparse
 
 test-suite test
