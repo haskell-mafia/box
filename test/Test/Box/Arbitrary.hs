@@ -20,7 +20,7 @@ data BoxResult =
 
 instance Arbitrary BoxResult where
   arbitrary = do
-    b@(Box _ _ _ (Name n) c f) <- arbitrary
+    b@(Box c f (Name n) _ _ _) <- arbitrary
 
     ndrop <- choose (0, T.length n)
     ntake <- choose (0, T.length n - ndrop)
