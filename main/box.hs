@@ -12,7 +12,9 @@ import qualified Control.Arrow as Arrow
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Either
 
-import           Data.Text as T
+import           Data.List (sort)
+import           Data.Text (Text)
+import qualified Data.Text as T
 
 import           Options.Applicative
 
@@ -24,14 +26,18 @@ import           System.IO
 import           System.Posix.User
 import           System.Posix.Process
 
+import           Text.PrettyPrint.Boxes ((<+>))
+import qualified Text.PrettyPrint.Boxes as PB
+
 import           X.Options.Applicative
 
 ------------------------------------------------------------------------
 -- Types
 
 data BoxCommand =
-    BoxIP  Query HostType
-  | BoxSSH Query [SSHArg]
+    BoxIP   Query HostType
+  | BoxSSH  Query [SSHArg]
+  | BoxList Query
   deriving (Eq, Show)
 
 data HostType =
@@ -60,8 +66,9 @@ main = do
       getProgName >>= \prog -> (putStrLn $ prog <> ": " <> buildInfoVersion) >> exitSuccess
     RunCommand r cmd -> do
       case cmd of
-        BoxIP  q host -> withBoxes (boxIP  r q host)
-        BoxSSH q args -> withBoxes (boxSSH r q args)
+        BoxIP   q host -> withBoxes (boxIP  r q host)
+        BoxSSH  q args -> withBoxes (boxSSH r q args)
+        BoxList q      -> withBoxes (boxList q)
 
 
 ------------------------------------------------------------------------
@@ -109,6 +116,32 @@ boxSSH runType qTarget args boxes = do
     RealRun ->
       -- This call never returns, the current process is replaced by 'ssh'.
       liftIO (exec "ssh" args')
+
+boxList :: Query -> [Box] -> EitherT BoxCommandError IO ()
+boxList q boxes = liftIO $ do
+    putStrLn ("total " <> show (length sorted))
+
+    PB.printBox $ col PB.left  (unClient  . boxClient)
+              <+> col PB.left  (unFlavour . boxFlavour)
+             <++> col PB.right (shortName)
+             <++> col PB.left  (unHost       . boxHost)
+             <++> col PB.left  (unHost       . boxPublicHost)
+             <++> col PB.left  (unInstanceId . boxInstance)
+  where
+    sorted       = sort (query q boxes)
+    col align f  = PB.vcat align (fmap (PB.text . T.unpack . f) sorted)
+
+    shortName  b = dropPrefix (namePrefix b)
+                              (unName (boxName b))
+
+    namePrefix b = unClient  (boxClient  b) <> "."
+                <> unFlavour (boxFlavour b) <> "."
+
+    dropPrefix p t
+      | p `T.isPrefixOf` t = T.drop (T.length p) t
+      | otherwise          = t
+
+    (<++>) l r = l PB.<> PB.emptyBox 0 2 PB.<> r
 
 
 ------------------------------------------------------------------------
@@ -170,6 +203,9 @@ commandP = subparser $
   <> command' "ssh"
               "SSH to a box."
               (BoxSSH <$> queryP <*> many sshArgP)
+  <> command' "ls"
+              "List available boxes."
+              (BoxList <$> (queryP <|> pure matchAll))
 
 hostTypeP :: Parser HostType
 hostTypeP =
@@ -182,6 +218,9 @@ queryP =
   argument (pOption queryParser) $
        metavar "FILTER"
     <> help "Filter using the following syntax: CLIENT[:FLAVOUR[:NAME]]"
+
+matchAll :: Query
+matchAll = Query ExactAll ExactAll InfixAll
 
 sshArgP :: Parser SSHArg
 sshArgP =

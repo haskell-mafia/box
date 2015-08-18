@@ -43,13 +43,13 @@ import           System.Random.Shuffle
 
 data Box =
   Box {
-      boxInstance :: InstanceId
-    , boxHost :: Host
+      boxClient     :: Client
+    , boxFlavour    :: Flavour
+    , boxName       :: Name
+    , boxInstance   :: InstanceId
+    , boxHost       :: Host
     , boxPublicHost :: Host
-    , boxName :: Name
-    , boxClient :: Client
-    , boxFlavour :: Flavour
-    } deriving (Eq, Show)
+    } deriving (Eq, Ord, Show)
 
 data BoxStore =
     BoxStoreLocal FilePath
@@ -75,27 +75,27 @@ data Infix a =
 newtype InstanceId =
   InstanceId {
     unInstanceId :: Text
-  } deriving (Eq, Show)
+  } deriving (Eq, Ord, Show)
 
 newtype Host =
   Host {
     unHost :: Text
-  } deriving (Eq, Show)
+  } deriving (Eq, Ord, Show)
 
 newtype Name =
   Name {
     unName :: Text
-  } deriving (Eq, Show)
+  } deriving (Eq, Ord, Show)
 
 newtype Client =
   Client {
     unClient :: Text
-  } deriving (Eq, Show)
+  } deriving (Eq, Ord, Show)
 
 newtype Flavour =
   Flavour {
     unFlavour :: Text
-  } deriving (Eq, Show)
+  } deriving (Eq, Ord, Show)
 
 data BoxError =
     BoxNotFound BoxStore
@@ -186,7 +186,7 @@ boxesToText bs =
   (<> "\n") . T.intercalate "\n" . fmap boxToText $ bs
 
 boxToText :: Box -> Text
-boxToText (Box (InstanceId i) (Host h) (Host p) (Name n) (Client c) (Flavour f)) =
+boxToText (Box (Client c) (Flavour f) (Name n) (InstanceId i) (Host h) (Host p)) =
   T.intercalate " " [i, h, p, n, c, f]
 
 boxParser :: Parser Box
@@ -200,7 +200,7 @@ boxParser = do
   c <- Client <$> ts
   f <- Flavour <$> t
   endOfInput
-  pure $ Box i h p n c f
+  pure $ Box c f n i h p
 
 boxStoreRender :: BoxStore -> Text
 boxStoreRender (BoxStoreLocal f) =

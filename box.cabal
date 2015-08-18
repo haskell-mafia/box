@@ -42,6 +42,7 @@ executable             box
     build-depends:     base
                      , attoparsec                      == 0.12.*
                      , box
+                     , boxes                           == 0.1.*
                      , either
                      , mismi-s3
                      , optparse-applicative            == 0.11.*
