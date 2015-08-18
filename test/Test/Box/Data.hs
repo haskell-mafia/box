@@ -15,8 +15,10 @@ import           Test.Box.Arbitrary ()
 import           Test.QuickCheck
 
 
-prop_parse_tripping = tripping boxToText boxFromText
-prop_parse_all_tripping = tripping boxesToText boxesFromText
+prop_parse_query_tripping = tripping queryRender queryFromText
+
+prop_parse_box_tripping   = tripping boxToText boxFromText
+prop_parse_boxes_tripping = tripping boxesToText boxesFromText
 
 prop_select_host b bs = testIO . fmap isJust . selectRandomBox $ b : bs
 prop_select_host_none = testIO . fmap isNothing . selectRandomBox $ []

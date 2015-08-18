@@ -20,8 +20,13 @@ data BoxResult =
 
 instance Arbitrary BoxResult where
   arbitrary = do
-    b@(Box i _ _ n c f) <- arbitrary
-    q <- Query <$> genMatch (pure i) <*> genMatch (pure n) <*> genMatch (pure c) <*> genMatch (pure f)
+    b@(Box _ _ _ (Name n) c f) <- arbitrary
+
+    ndrop <- choose (0, T.length n)
+    ntake <- choose (0, T.length n - ndrop)
+    let n' = Name (T.take ntake (T.drop ndrop n))
+
+    q <- Query <$> genExact (pure c) <*> genExact (pure f) <*> genInfix (pure n')
     pure $ BoxResult b q
 
 instance Arbitrary Box where
@@ -38,15 +43,23 @@ instance Arbitrary Query where
     <$> arbitrary
     <*> arbitrary
     <*> arbitrary
-    <*> arbitrary
 
-instance Arbitrary a => Arbitrary (Match a) where
-  arbitrary = genMatch arbitrary
+instance Arbitrary a => Arbitrary (Exact a) where
+  arbitrary = genExact arbitrary
 
-genMatch :: Gen a -> Gen (Match a)
-genMatch g = frequency [
-    (3, Match <$> g)
-  , (1, pure MatchAll)
+genExact :: Gen a -> Gen (Exact a)
+genExact g = frequency [
+    (3, Exact <$> g)
+  , (1, pure ExactAll)
+  ]
+
+instance Arbitrary a => Arbitrary (Infix a) where
+  arbitrary = genInfix arbitrary
+
+genInfix :: Gen a -> Gen (Infix a)
+genInfix g = frequency [
+    (3, Infix <$> g)
+  , (1, pure InfixAll)
   ]
 
 instance Arbitrary InstanceId where

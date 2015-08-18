@@ -1,9 +1,12 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+
 module Box.Query (
     query
   , match
-  , matchText
+  , matchExact
+  , matchInfix
   ) where
 
 import           Box.Data
@@ -13,22 +16,24 @@ import           Data.Text as T
 
 import           P
 
-import qualified System.FilePath.Glob as G
-
+------------------------------------------------------------------------
 
 query :: Query -> [Box] -> [Box]
 query q =
   L.filter (match q)
 
 match :: Query -> Box -> Bool
-match (Query qi qn qc qf) (Box bi _ _ bn bc bf) =
-     matchText unName bn qn
-  && matchText unInstanceId bi qi
-  && matchText unClient bc qc
-  && matchText unFlavour bf qf
+match (Query qc qf qn) (Box _ _ _ bn bc bf) =
+     matchExact unClient  bc qc
+  && matchExact unFlavour bf qf
+  && matchInfix unName    bn qn
 
-matchText :: (a -> Text) -> a -> Match a -> Bool
-matchText _ _ MatchAll =
-  True
-matchText un a (Match mq) =
-  flip G.match (T.unpack $ un a) . G.compile . T.unpack . un $ mq
+matchExact :: (a -> Text) -> a -> Exact a -> Bool
+matchExact takeText b = \case
+  Exact q  -> takeText q == takeText b
+  ExactAll -> True
+
+matchInfix :: (a -> Text) -> a -> Infix a -> Bool
+matchInfix takeText b = \case
+  Infix q  -> takeText q `T.isInfixOf` takeText b
+  InfixAll -> True
