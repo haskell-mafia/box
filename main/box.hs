@@ -127,25 +127,15 @@ boxList :: Query -> [Box] -> EitherT BoxCommandError IO ()
 boxList q boxes = liftIO $ do
     putStrLn ("total " <> show (length sorted))
 
-    PB.printBox $ col PB.left  (unClient  . boxClient)
-              <+> col PB.left  (unFlavour . boxFlavour)
-             <++> col PB.right (shortName)
+    PB.printBox $ col PB.left  (unClient     . boxClient)
+              <+> col PB.left  (unFlavour    . boxFlavour)
+             <++> col PB.right (unName       . boxShortName)
              <++> col PB.left  (unHost       . boxHost)
              <++> col PB.left  (unHost       . boxPublicHost)
              <++> col PB.left  (unInstanceId . boxInstance)
   where
     sorted       = sort (query q boxes)
     col align f  = PB.vcat align (fmap (PB.text . T.unpack . f) sorted)
-
-    shortName  b = dropPrefix (namePrefix b)
-                              (unName (boxName b))
-
-    namePrefix b = unClient  (boxClient  b) <> "."
-                <> unFlavour (boxFlavour b) <> "."
-
-    dropPrefix p t
-      | p `T.isPrefixOf` t = T.drop (T.length p) t
-      | otherwise          = t
 
     (<++>) l r = l PB.<> PB.emptyBox 0 2 PB.<> r
 
@@ -154,16 +144,18 @@ boxList q boxes = liftIO $ do
 -- Utils
 
 withBoxes :: ([Box] -> EitherT BoxCommandError IO ()) -> IO ()
-withBoxes io = orDie boxCommandErrorRender $ do
-    cache <- liftIO readCache
-    case cache of
-      Just boxes -> io boxes
-      Nothing    -> do
-        store <- liftIO storeEnv
-        boxes <- EitherT (Arrow.left BoxError <$> runS3WithDefaults (readBoxes store))
-        liftIO (writeCache boxes)
-        io boxes
-    liftIO exitSuccess
+withBoxes io = orDie boxCommandErrorRender (withBoxes' io >> liftIO exitSuccess)
+
+withBoxes' :: ([Box] -> EitherT BoxCommandError IO a) -> EitherT BoxCommandError IO a
+withBoxes' io = do
+  cache <- liftIO readCache
+  case cache of
+    Just boxes -> io boxes
+    Nothing    -> do
+      store <- liftIO storeEnv
+      boxes <- EitherT (Arrow.left BoxError <$> runS3WithDefaults (readBoxes store))
+      liftIO (writeCache boxes)
+      io boxes
 
 readCache :: IO (Maybe [Box])
 readCache = handle onError . liftIO $ do
@@ -264,6 +256,7 @@ queryP :: Parser Query
 queryP =
   argument (pOption queryParser) $
        metavar "FILTER"
+    <> completer filterCompleter
     <> help "Filter using the following syntax: CLIENT[:FLAVOUR[:NAME]]"
 
 matchAll :: Query
@@ -274,3 +267,13 @@ sshArgP =
   argument textRead $
        metavar "SSH_ARGUMENTS"
     <> help "Extra arguments to pass to ssh."
+
+filterCompleter :: Completer
+filterCompleter = mkCompleter $ \arg -> run $ \boxes -> do
+    return . fmap T.unpack
+           $ completions (T.pack arg) boxes
+  where
+    run :: ([Box] -> EitherT BoxCommandError IO [a]) -> IO [a]
+    run io = do
+      x <- runEitherT (withBoxes' io)
+      return (either (const []) id x)
