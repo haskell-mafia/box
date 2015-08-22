@@ -1,30 +1,36 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Main (main) where
 
 import           BuildInfo_box
 
-import           Box
+import           Box hiding ((</>))
 
 import qualified Control.Arrow as Arrow
+import           Control.Exception
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Either
 
 import           Data.List (sort)
 import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.IO as T
+import           Data.Time (getCurrentTime, diffUTCTime)
 
 import           Options.Applicative
 
 import           P
 
+import           System.Directory
 import           System.Environment
 import           System.Exit
+import           System.FilePath ((</>), takeDirectory)
 import           System.IO
-import           System.Posix.User
 import           System.Posix.Process
+import           System.Posix.User
 
 import           Text.PrettyPrint.Boxes ((<+>))
 import qualified Text.PrettyPrint.Boxes as PB
@@ -149,10 +155,45 @@ boxList q boxes = liftIO $ do
 
 withBoxes :: ([Box] -> EitherT BoxCommandError IO ()) -> IO ()
 withBoxes io = orDie boxCommandErrorRender $ do
-  store <- liftIO storeEnv
-  boxes <- EitherT (Arrow.left BoxError <$> runS3WithDefaults (readBoxes store))
-  io boxes
-  liftIO exitSuccess
+    cache <- liftIO readCache
+    case cache of
+      Just boxes -> io boxes
+      Nothing    -> do
+        store <- liftIO storeEnv
+        boxes <- EitherT (Arrow.left BoxError <$> runS3WithDefaults (readBoxes store))
+        liftIO (writeCache boxes)
+        io boxes
+    liftIO exitSuccess
+
+readCache :: IO (Maybe [Box])
+readCache = handle onError . liftIO $ do
+    path  <- cacheEnv
+    stale <- isStale path
+    case stale of
+      True  -> return Nothing
+      False -> do
+       cache <- T.readFile path
+       return (either (const Nothing) Just (boxesFromText cache))
+  where
+    onError (_ :: IOException) = return Nothing
+
+    -- The cache is considered stale if it was
+    -- downloaded more than a minute ago.
+    isStale path = do
+        now      <- getCurrentTime
+        modified <- getModificationTime path
+
+        let age = now `diffUTCTime` modified
+
+        return (age > 60)
+
+writeCache :: [Box] -> IO ()
+writeCache boxes = handle onError . liftIO $ do
+    path <- cacheEnv
+    createDirectoryIfMissing True (takeDirectory path)
+    T.writeFile path (boxesToText boxes)
+  where
+    onError (_ :: IOException) = return ()
 
 randomBoxOfQuery :: MonadIO m => Query -> [Box] -> EitherT BoxCommandError m Box
 randomBoxOfQuery q bs = do
@@ -185,8 +226,14 @@ userEnv =
   T.pack <$> (maybe getLoginName return =<< lookupEnv "BOX_USER")
 
 identityEnv :: IO Text
-identityEnv =
-  T.pack . fromMaybe "~/.ssh/ambiata_rsa" <$> lookupEnv "BOX_IDENTITY"
+identityEnv = do
+  home <- getHomeDirectory
+  T.pack . fromMaybe (home </> ".ssh/ambiata_rsa") <$> lookupEnv "BOX_IDENTITY"
+
+cacheEnv :: IO FilePath
+cacheEnv = do
+  home <- getHomeDirectory
+  fromMaybe (home </> ".ambiata/box/cache") <$> lookupEnv "BOX_CACHE"
 
 
 ------------------------------------------------------------------------

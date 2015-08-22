@@ -43,11 +43,14 @@ executable             box
                      , attoparsec                      == 0.12.*
                      , box
                      , boxes                           == 0.1.*
-                     , either
+                     , directory                       == 1.2.*
+                     , either                          == 4.3.*
+                     , filepath                        >= 1.3        && < 1.5
                      , mismi-s3
                      , optparse-applicative            == 0.11.*
                      , p
                      , text
+                     , time                            >= 1.4        && < 1.6
                      , transformers                    >= 0.3        && < 0.5
                      , unix                            == 2.7.*
                      , x-optparse
