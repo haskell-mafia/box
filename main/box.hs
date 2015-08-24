@@ -16,6 +16,7 @@ import           Control.Monad.Trans.Either
 import           Data.List (sort)
 import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.IO as T
 
 import           Options.Applicative
 
@@ -122,7 +123,12 @@ boxSSH runType qTarget args boxes = do
   case runType of
     DryRun  ->
       liftIO (print ("ssh" : args'))
-    RealRun ->
+
+    RealRun -> do
+      -- Set the title of the terminal.
+      liftIO (T.putStr ("\ESC]0;" <> targetName <> "\BEL"))
+      liftIO (hFlush stdout)
+
       -- This call never returns, the current process is replaced by 'ssh'.
       liftIO (exec "ssh" args')
 
