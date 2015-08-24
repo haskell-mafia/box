@@ -19,6 +19,8 @@ module Box.Data (
   , queryFromText
   , queryParser
   , queryRender
+  , queryOfBox
+  , boxShortName
   , boxesFromText
   , boxFromText
   , boxesToText
@@ -160,6 +162,11 @@ queryRender (Query c f n) =
     sepfn | isInfixMatch n = ":"
           | otherwise      = ""
 
+queryOfBox :: Box -> Query
+queryOfBox b = Query (Exact (boxClient    b))
+                     (Exact (boxFlavour   b))
+                     (Infix (boxShortName b))
+
 exactRender :: (a -> Text) -> Exact a -> Text
 exactRender _ (ExactAll) = ""
 exactRender f (Exact x)  = f x
@@ -170,6 +177,17 @@ infixRender f (Infix x)  = f x
 
 ------------------------------------------------------------------------
 -- Box
+
+boxShortName :: Box -> Name
+boxShortName b = Name (dropPrefix namePrefix name)
+  where
+    name       = unName    (boxName    b)
+    namePrefix = unClient  (boxClient  b) <> "."
+              <> unFlavour (boxFlavour b) <> "."
+
+    dropPrefix p t
+      | p `T.isPrefixOf` t = T.drop (T.length p) t
+      | otherwise          = t
 
 boxesFromText :: Text -> Either Text [Box]
 boxesFromText =

@@ -1,12 +1,13 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Main (main) where
 
 import           BuildInfo_box
 
-import           Box
+import           Box hiding ((</>))
 
 import qualified Control.Arrow as Arrow
 import           Control.Monad.IO.Class
@@ -20,11 +21,13 @@ import           Options.Applicative
 
 import           P
 
+import           System.Directory
 import           System.Environment
 import           System.Exit
+import           System.FilePath ((</>))
 import           System.IO
-import           System.Posix.User
 import           System.Posix.Process
+import           System.Posix.User
 
 import           Text.PrettyPrint.Boxes ((<+>))
 import qualified Text.PrettyPrint.Boxes as PB
@@ -66,9 +69,15 @@ main = do
       getProgName >>= \prog -> (putStrLn $ prog <> ": " <> buildInfoVersion) >> exitSuccess
     RunCommand r cmd -> do
       case cmd of
-        BoxIP   q host -> withBoxes (boxIP  r q host)
-        BoxSSH  q args -> withBoxes (boxSSH r q args)
-        BoxList q      -> withBoxes (boxList q)
+        BoxIP   q host -> runCommand (boxIP  r q host)
+        BoxSSH  q args -> runCommand (boxSSH r q args)
+        BoxList q      -> runCommand (boxList q)
+
+runCommand :: ([Box] -> EitherT BoxCommandError IO ()) -> IO ()
+runCommand cmd = orDie boxCommandErrorRender $ do
+  boxes <- fetchBoxes
+  cmd boxes
+  liftIO exitSuccess
 
 
 ------------------------------------------------------------------------
@@ -121,9 +130,9 @@ boxList :: Query -> [Box] -> EitherT BoxCommandError IO ()
 boxList q boxes = liftIO $ do
     putStrLn ("total " <> show (length sorted))
 
-    PB.printBox $ col PB.left  (unClient  . boxClient)
-              <+> col PB.left  (unFlavour . boxFlavour)
-             <++> col PB.right (shortName)
+    PB.printBox $ col PB.left  (unClient     . boxClient)
+              <+> col PB.left  (unFlavour    . boxFlavour)
+             <++> col PB.right (unName       . boxShortName)
              <++> col PB.left  (unHost       . boxHost)
              <++> col PB.left  (unHost       . boxPublicHost)
              <++> col PB.left  (unInstanceId . boxInstance)
@@ -131,28 +140,24 @@ boxList q boxes = liftIO $ do
     sorted       = sort (query q boxes)
     col align f  = PB.vcat align (fmap (PB.text . T.unpack . f) sorted)
 
-    shortName  b = dropPrefix (namePrefix b)
-                              (unName (boxName b))
-
-    namePrefix b = unClient  (boxClient  b) <> "."
-                <> unFlavour (boxFlavour b) <> "."
-
-    dropPrefix p t
-      | p `T.isPrefixOf` t = T.drop (T.length p) t
-      | otherwise          = t
-
     (<++>) l r = l PB.<> PB.emptyBox 0 2 PB.<> r
 
 
 ------------------------------------------------------------------------
 -- Utils
 
-withBoxes :: ([Box] -> EitherT BoxCommandError IO ()) -> IO ()
-withBoxes io = orDie boxCommandErrorRender $ do
-  store <- liftIO storeEnv
-  boxes <- EitherT (Arrow.left BoxError <$> runS3WithDefaults (readBoxes store))
-  io boxes
-  liftIO exitSuccess
+fetchBoxes :: EitherT BoxCommandError IO [Box]
+fetchBoxes = do
+  let timeout = 60 -- seconds
+  path  <- liftIO cacheEnv
+  cache <- liftIO (readCache path timeout)
+  case cache of
+    Just boxes -> return boxes
+    Nothing    -> do
+      store <- liftIO storeEnv
+      boxes <- EitherT (Arrow.left BoxError <$> runS3WithDefaults (readBoxes store))
+      liftIO (writeCache path boxes)
+      return boxes
 
 randomBoxOfQuery :: MonadIO m => Query -> [Box] -> EitherT BoxCommandError m Box
 randomBoxOfQuery q bs = do
@@ -185,8 +190,14 @@ userEnv =
   T.pack <$> (maybe getLoginName return =<< lookupEnv "BOX_USER")
 
 identityEnv :: IO Text
-identityEnv =
-  T.pack . fromMaybe "~/.ssh/ambiata_rsa" <$> lookupEnv "BOX_IDENTITY"
+identityEnv = do
+  home <- getHomeDirectory
+  T.pack . fromMaybe (home </> ".ssh/ambiata_rsa") <$> lookupEnv "BOX_IDENTITY"
+
+cacheEnv :: IO FilePath
+cacheEnv = do
+  home <- getHomeDirectory
+  fromMaybe (home </> ".ambiata/box/cache") <$> lookupEnv "BOX_CACHE"
 
 
 ------------------------------------------------------------------------
@@ -217,6 +228,7 @@ queryP :: Parser Query
 queryP =
   argument (pOption queryParser) $
        metavar "FILTER"
+    <> completer filterCompleter
     <> help "Filter using the following syntax: CLIENT[:FLAVOUR[:NAME]]"
 
 matchAll :: Query
@@ -227,3 +239,12 @@ sshArgP =
   argument textRead $
        metavar "SSH_ARGUMENTS"
     <> help "Extra arguments to pass to ssh."
+
+filterCompleter :: Completer
+filterCompleter = mkCompleter $ \arg -> do
+    boxes <- tryFetchBoxes
+    return . fmap T.unpack
+           $ completions (T.pack arg) boxes
+  where
+    tryFetchBoxes :: IO [Box]
+    tryFetchBoxes = either (const []) id <$> runEitherT fetchBoxes
