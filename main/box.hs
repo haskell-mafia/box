@@ -10,15 +10,12 @@ import           BuildInfo_box
 import           Box hiding ((</>))
 
 import qualified Control.Arrow as Arrow
-import           Control.Exception
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Either
 
 import           Data.List (sort)
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.IO as T
-import           Data.Time (getCurrentTime, diffUTCTime)
 
 import           Options.Applicative
 
@@ -27,7 +24,7 @@ import           P
 import           System.Directory
 import           System.Environment
 import           System.Exit
-import           System.FilePath ((</>), takeDirectory)
+import           System.FilePath ((</>))
 import           System.IO
 import           System.Posix.Process
 import           System.Posix.User
@@ -72,9 +69,15 @@ main = do
       getProgName >>= \prog -> (putStrLn $ prog <> ": " <> buildInfoVersion) >> exitSuccess
     RunCommand r cmd -> do
       case cmd of
-        BoxIP   q host -> withBoxes (boxIP  r q host)
-        BoxSSH  q args -> withBoxes (boxSSH r q args)
-        BoxList q      -> withBoxes (boxList q)
+        BoxIP   q host -> runCommand (boxIP  r q host)
+        BoxSSH  q args -> runCommand (boxSSH r q args)
+        BoxList q      -> runCommand (boxList q)
+
+runCommand :: ([Box] -> EitherT BoxCommandError IO ()) -> IO ()
+runCommand cmd = orDie boxCommandErrorRender $ do
+  boxes <- fetchBoxes
+  cmd boxes
+  liftIO exitSuccess
 
 
 ------------------------------------------------------------------------
@@ -143,49 +146,18 @@ boxList q boxes = liftIO $ do
 ------------------------------------------------------------------------
 -- Utils
 
-withBoxes :: ([Box] -> EitherT BoxCommandError IO ()) -> IO ()
-withBoxes io = orDie boxCommandErrorRender (withBoxes' io >> liftIO exitSuccess)
-
-withBoxes' :: ([Box] -> EitherT BoxCommandError IO a) -> EitherT BoxCommandError IO a
-withBoxes' io = do
-  cache <- liftIO readCache
+fetchBoxes :: EitherT BoxCommandError IO [Box]
+fetchBoxes = do
+  let timeout = 60 -- seconds
+  path  <- liftIO cacheEnv
+  cache <- liftIO (readCache path timeout)
   case cache of
-    Just boxes -> io boxes
+    Just boxes -> return boxes
     Nothing    -> do
       store <- liftIO storeEnv
       boxes <- EitherT (Arrow.left BoxError <$> runS3WithDefaults (readBoxes store))
-      liftIO (writeCache boxes)
-      io boxes
-
-readCache :: IO (Maybe [Box])
-readCache = handle onError . liftIO $ do
-    path  <- cacheEnv
-    stale <- isStale path
-    case stale of
-      True  -> return Nothing
-      False -> do
-       cache <- T.readFile path
-       return (either (const Nothing) Just (boxesFromText cache))
-  where
-    onError (_ :: IOException) = return Nothing
-
-    -- The cache is considered stale if it was
-    -- downloaded more than a minute ago.
-    isStale path = do
-        now      <- getCurrentTime
-        modified <- getModificationTime path
-
-        let age = now `diffUTCTime` modified
-
-        return (age > 60)
-
-writeCache :: [Box] -> IO ()
-writeCache boxes = handle onError . liftIO $ do
-    path <- cacheEnv
-    createDirectoryIfMissing True (takeDirectory path)
-    T.writeFile path (boxesToText boxes)
-  where
-    onError (_ :: IOException) = return ()
+      liftIO (writeCache path boxes)
+      return boxes
 
 randomBoxOfQuery :: MonadIO m => Query -> [Box] -> EitherT BoxCommandError m Box
 randomBoxOfQuery q bs = do
@@ -269,11 +241,10 @@ sshArgP =
     <> help "Extra arguments to pass to ssh."
 
 filterCompleter :: Completer
-filterCompleter = mkCompleter $ \arg -> run $ \boxes -> do
+filterCompleter = mkCompleter $ \arg -> do
+    boxes <- tryFetchBoxes
     return . fmap T.unpack
            $ completions (T.pack arg) boxes
   where
-    run :: ([Box] -> EitherT BoxCommandError IO [a]) -> IO [a]
-    run io = do
-      x <- runEitherT (withBoxes' io)
-      return (either (const []) id x)
+    tryFetchBoxes :: IO [Box]
+    tryFetchBoxes = either (const []) id <$> runEitherT fetchBoxes
