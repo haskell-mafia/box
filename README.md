@@ -56,3 +56,32 @@ filter specified. The thinking behind this is that we get a load balancing
 effect, so not everyone is hammering the same server.
 
 `box ssh` also chooses a random gateway to bounce through for the same reason.
+
+### Completion Support
+
+#### Bash
+
+For bash completion, you need to source the `box-completion.bash` from
+your `.bashrc` or `.bash_profile`.
+
+#### Z Shell
+
+For zsh completion, you need to copy or symlink `_box.zsh` to directory in
+your `fpath` and make sure it is called `_box`.
+
+For example, I have created a symlink:
+
+```sh
+ln -s $HOME/src/ambiata/box/_box.zsh $HOME/.config/zsh/completions/_box
+```
+
+and I have the following in my `.zshrc`:
+
+```zsh
+fpath=($HOME/.config/zsh/completions $fpath)
+```
+
+#### Ambiata App Shop
+
+It would be nice if we had a way to distribute these kind of auxiliary
+scripts as part of an `appshop-update`.
