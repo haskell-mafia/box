@@ -91,13 +91,13 @@ boxIP _ q hostType boxes = do
 
 boxSSH :: RunType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
 boxSSH runType qTarget args boxes = do
-  let qGateway = Query ExactAll (Exact (Flavour "gateway")) InfixAll
+  let qGateway = Query ExactAll (Exact (Flavour "gateway")) InfixAll ExactAll
 
   t <- randomBoxOfQuery qTarget  boxes
   g <- randomBoxOfQuery qGateway boxes
 
   let targetHost  = unHost (selectHost InternalHost t)
-  let targetName  = unName (boxName t)
+  let targetName  = unName (boxName t) <> "." <> unInstanceId (boxInstance t)
   let gatewayHost = unHost (selectHost ExternalHost g)
 
   user     <- liftIO userEnv
@@ -238,7 +238,7 @@ queryP =
     <> help "Filter using the following syntax: CLIENT[:FLAVOUR[:NAME]]"
 
 matchAll :: Query
-matchAll = Query ExactAll ExactAll InfixAll
+matchAll = Query ExactAll ExactAll InfixAll ExactAll
 
 sshArgP :: Parser SSHArg
 sshArgP =

@@ -20,13 +20,17 @@ data BoxResult =
 
 instance Arbitrary BoxResult where
   arbitrary = do
-    b@(Box c f (Name n) _ _ _) <- arbitrary
+    b@(Box c f (Name n) i _ _) <- arbitrary
 
     ndrop <- choose (0, T.length n)
     ntake <- choose (0, T.length n - ndrop)
     let n' = Name (T.take ntake (T.drop ndrop n))
 
-    q <- Query <$> genExact (pure c) <*> genExact (pure f) <*> genInfix (pure n')
+    q <- Query <$> genExact (pure c)
+               <*> genExact (pure f)
+               <*> genInfix (pure n')
+               <*> genExact (pure i)
+
     pure $ BoxResult b q
 
 instance Arbitrary Box where
@@ -41,6 +45,7 @@ instance Arbitrary Box where
 instance Arbitrary Query where
   arbitrary = Query
     <$> arbitrary
+    <*> arbitrary
     <*> arbitrary
     <*> arbitrary
 
