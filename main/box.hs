@@ -193,7 +193,7 @@ storeEnv =
 
 userEnv :: IO Text
 userEnv =
-  T.pack <$> (maybe getLoginName return =<< lookupEnv "BOX_USER")
+  T.pack <$> (maybe getEffectiveUserName return =<< lookupEnv "BOX_USER")
 
 identityEnv :: IO Text
 identityEnv = do
