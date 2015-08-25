@@ -59,9 +59,10 @@ data BoxStore =
   deriving (Eq, Show)
 
 data Query = Query {
-    queryClient  :: Exact Client
-  , queryFlavour :: Exact Flavour
-  , queryName    :: Infix Name
+    queryClient   :: Exact Client
+  , queryFlavour  :: Exact Flavour
+  , queryName     :: Infix Name
+  , queryInstance :: Exact InstanceId
   } deriving (Eq, Show)
 
 data Exact a =
@@ -117,8 +118,8 @@ isInfixMatch (InfixAll) = False
 isInfixMatch (Infix _)  = True
 
 queryHasMatch :: Query -> Bool
-queryHasMatch (Query c f n) =
-  isExactMatch c || isExactMatch f || isInfixMatch n
+queryHasMatch (Query c f n i) =
+  isExactMatch c || isExactMatch f || isInfixMatch n || isExactMatch i
 
 queryFromText :: Text -> Either Text Query
 queryFromText =
@@ -127,15 +128,17 @@ queryFromText =
 queryParser :: Parser Query
 queryParser =
   part `AP.sepBy1` delim <* AP.endOfInput >>= \case
-    []         -> pure $ Query (mClient Nothing) (mFlavour Nothing) (mName Nothing)
-    (c:[])     -> pure $ Query (mClient c)       (mFlavour Nothing) (mName Nothing)
-    (c:f:[])   -> pure $ Query (mClient c)       (mFlavour f)       (mName Nothing)
-    (c:f:n:[]) -> pure $ Query (mClient c)       (mFlavour f)       (mName n)
-    _          -> fail "filter can only contain three parts (client, flavour, name)"
+    []           -> pure $ Query (mClient Nothing) (mFlavour Nothing) (mName Nothing) (mInstance Nothing)
+    (c:[])       -> pure $ Query (mClient c)       (mFlavour Nothing) (mName Nothing) (mInstance Nothing)
+    (c:f:[])     -> pure $ Query (mClient c)       (mFlavour f)       (mName Nothing) (mInstance Nothing)
+    (c:f:n:[])   -> pure $ Query (mClient c)       (mFlavour f)       (mName n)       (mInstance Nothing)
+    (c:f:n:i:[]) -> pure $ Query (mClient c)       (mFlavour f)       (mName n)       (mInstance i)
+    _            -> fail "filter can only contain four parts (client, flavour, name, instance)"
   where
-    mClient  = maybe ExactAll (Exact . Client)
-    mFlavour = maybe ExactAll (Exact . Flavour)
-    mName    = maybe InfixAll (Infix . Name)
+    mClient   = maybe ExactAll (Exact . Client)
+    mFlavour  = maybe ExactAll (Exact . Flavour)
+    mName     = maybe InfixAll (Infix . Name)
+    mInstance = maybe ExactAll (Exact . InstanceId)
 
     part  = takeMaybe <$> AP.takeWhile (/= ':')
     delim = AP.char ':'
@@ -144,28 +147,39 @@ queryParser =
                 | otherwise = Just t
 
 queryRender :: Query -> Text
-queryRender (Query c f n) =
-       exactRender unClient  c
+queryRender (Query c f n i) =
+       exactRender unClient     c
     <> sepcf
-    <> exactRender unFlavour f
+    <> exactRender unFlavour    f
     <> sepfn
-    <> infixRender unName    n
+    <> infixRender unName       n
+    <> sepni
+    <> exactRender unInstanceId i
   where
     -- we need a separator between client/flavour if
-    -- flavour or name are not a wildcard match
-    sepcf | isExactMatch f = ":"
-          | isInfixMatch n = ":"
+    -- flavour, name, or instance are not a wildcard match
+    sepcf | im || nm || fm = ":"
           | otherwise      = ""
 
     -- we need a separator between flavour/name if
-    -- name is not a wildcard match
-    sepfn | isInfixMatch n = ":"
-          | otherwise      = ""
+    -- name or instance is not a wildcard match
+    sepfn | im || nm  = ":"
+          | otherwise = ""
+
+    -- we need a separator between name/instance if
+    -- instance is not a wildcard match
+    sepni | im        = ":"
+          | otherwise = ""
+
+    fm = isExactMatch f
+    nm = isInfixMatch n
+    im = isExactMatch i
 
 queryOfBox :: Box -> Query
 queryOfBox b = Query (Exact (boxClient    b))
                      (Exact (boxFlavour   b))
                      (Infix (boxShortName b))
+                     (Exact (boxInstance  b))
 
 exactRender :: (a -> Text) -> Exact a -> Text
 exactRender _ (ExactAll) = ""

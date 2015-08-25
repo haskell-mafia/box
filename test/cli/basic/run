@@ -21,6 +21,8 @@ $BOX ip mincom:land:zoot
 $BOX ip mincom:land:zoot.golden
 $BOX ip mincom:land:golden
 $BOX ip ::zoot.golden
+$BOX ip :::i-a6g1d97a
+$BOX ip :::i-fe6988ed
 if $BOX ip acme:land; then exit 1; fi
 if $BOX ip mincom:land:brown; then exit 1; fi
 if $BOX ip mincom:land:kermit; then exit 1; fi
@@ -34,7 +36,7 @@ function check() {
   fi
 }
 
-EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' '$BOX_USER'@54.1.1.6 nc %h %p 2>/dev/null","-o","HostKeyAlias=box.acme.lab.kermit.brown.717.jump","'$BOX_USER'@192.31.14.3"]'
+EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' '$BOX_USER'@54.1.1.6 nc %h %p 2>/dev/null","-o","HostKeyAlias=box.acme.lab.kermit.brown.717.i-a6g1d97a.jump","'$BOX_USER'@192.31.14.3"]'
 ACTUAL=$($BOX --dry-run ssh acme:lab)
 check "$EXPECT" "$ACTUAL"
 

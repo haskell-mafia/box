@@ -41,11 +41,18 @@ completionsOfBox arg box =
             n <- [ name ]
             return (c <> f <> n)
 
+    3 -> do c <- [ client,  ":" ]
+            f <- [ flavour, ":" ]
+            n <- [ name,    ":" ]
+            i <- [ instanceId ]
+            return (c <> f <> n <> i)
+
     _ -> []
   where
-    client  = unClient  (boxClient    box) <> ":"
-    flavour = unFlavour (boxFlavour   box) <> ":"
-    name    = unName    (boxShortName box)
+    client     = unClient     (boxClient    box) <> ":"
+    flavour    = unFlavour    (boxFlavour   box) <> ":"
+    name       = unName       (boxShortName box) <> ":"
+    instanceId = unInstanceId (boxInstance  box)
 
 ------------------------------------------------------------------------
 

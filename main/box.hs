@@ -91,7 +91,7 @@ boxIP _ q hostType boxes = do
 
 boxSSH :: RunType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
 boxSSH runType qTarget args boxes = do
-  let qGateway = Query ExactAll (Exact (Flavour "gateway")) InfixAll
+  let qGateway = Query ExactAll (Exact (Flavour "gateway")) InfixAll ExactAll
 
   t <- randomBoxOfQuery qTarget  boxes
   g <- randomBoxOfQuery qGateway boxes
@@ -238,7 +238,7 @@ queryP =
     <> help "Filter using the following syntax: CLIENT[:FLAVOUR[:NAME]]"
 
 matchAll :: Query
-matchAll = Query ExactAll ExactAll InfixAll
+matchAll = Query ExactAll ExactAll InfixAll ExactAll
 
 sshArgP :: Parser SSHArg
 sshArgP =

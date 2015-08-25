@@ -23,10 +23,11 @@ query q =
   L.filter (match q)
 
 match :: Query -> Box -> Bool
-match (Query qc qf qn) (Box bc bf bn _ _ _) =
-     matchExact unClient  bc qc
-  && matchExact unFlavour bf qf
-  && matchInfix unName    bn qn
+match (Query qc qf qn qi) (Box bc bf bn bi _ _) =
+     matchExact unClient     bc qc
+  && matchExact unFlavour    bf qf
+  && matchInfix unName       bn qn
+  && matchExact unInstanceId bi qi
 
 matchExact :: (a -> Text) -> a -> Exact a -> Bool
 matchExact takeText b = \case
