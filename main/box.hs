@@ -152,18 +152,22 @@ boxList q boxes = liftIO $ do
 ------------------------------------------------------------------------
 -- Utils
 
-fetchBoxes :: EitherT BoxCommandError IO [Box]
-fetchBoxes = do
+cachedBoxes :: EitherT BoxCommandError IO [Box]
+cachedBoxes = do
   let timeout = 60 -- seconds
   path  <- liftIO cacheEnv
   cache <- liftIO (readCache path timeout)
   case cache of
     Just boxes -> return boxes
-    Nothing    -> do
-      store <- liftIO storeEnv
-      boxes <- EitherT (Arrow.left BoxError <$> runS3WithDefaults (readBoxes store))
-      liftIO (writeCache path boxes)
-      return boxes
+    Nothing    -> fetchBoxes
+
+fetchBoxes :: EitherT BoxCommandError IO [Box]
+fetchBoxes = do
+  store <- liftIO storeEnv
+  boxes <- EitherT (Arrow.left BoxError <$> runS3WithDefaults (readBoxes store))
+  path  <- liftIO cacheEnv
+  liftIO (writeCache path boxes)
+  return boxes
 
 randomBoxOfQuery :: MonadIO m => Query -> [Box] -> EitherT BoxCommandError m Box
 randomBoxOfQuery q bs = do
@@ -253,4 +257,4 @@ filterCompleter = mkCompleter $ \arg -> do
            $ completions (T.pack arg) boxes
   where
     tryFetchBoxes :: IO [Box]
-    tryFetchBoxes = either (const []) id <$> runEitherT fetchBoxes
+    tryFetchBoxes = either (const []) id <$> runEitherT cachedBoxes
