@@ -97,7 +97,7 @@ boxSSH runType qTarget args boxes = do
   g <- randomBoxOfQuery qGateway boxes
 
   let targetHost  = unHost (selectHost InternalHost t)
-  let targetName  = unName (boxName t)
+  let targetName  = unName (boxName t) <> "." <> unInstanceId (boxInstance t)
   let gatewayHost = unHost (selectHost ExternalHost g)
 
   user     <- liftIO userEnv
