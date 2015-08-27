@@ -66,9 +66,17 @@ main = do
   hSetBuffering stdout LineBuffering
   hSetBuffering stderr LineBuffering
   dispatch boxP >>= \case
-    VersionCommand ->
-      getProgName >>= \prog -> (putStrLn $ prog <> ": " <> buildInfoVersion) >> exitSuccess
-    RunCommand r cmd -> do
+
+    ZshCommands cmds -> do
+      forM_ cmds $ \(Command label desc _) ->
+        T.putStrLn (label <> ":" <> desc)
+
+    Safe VersionCommand -> do
+      prog <- getProgName
+      putStrLn (prog <> ": " <> buildInfoVersion)
+      exitSuccess
+
+    Safe (RunCommand r cmd) -> do
       case cmd of
         BoxIP   q host -> runCommand (boxIP  r q host)
         BoxSSH  q args -> runCommand (boxSSH r q args)
@@ -213,20 +221,21 @@ cacheEnv = do
 ------------------------------------------------------------------------
 -- Argument Parsing
 
-boxP :: Parser (SafeCommand BoxCommand)
-boxP = safeCommand commandP
+boxP :: Parser (CompCommands BoxCommand)
+boxP = commandsP boxCommands
 
-commandP :: Parser BoxCommand
-commandP = subparser $
-     command' "ip"
-              "Get the IP address of a box."
-              (BoxIP <$> queryP <*> hostTypeP)
-  <> command' "ssh"
-              "SSH to a box."
-              (BoxSSH <$> queryP <*> many sshArgP)
-  <> command' "ls"
-              "List available boxes."
-              (BoxList <$> (queryP <|> pure matchAll))
+boxCommands :: [Command BoxCommand]
+boxCommands =
+  [ Command "ip"  "Get the IP address of a box."
+            (BoxIP   <$> queryP <*> hostTypeP)
+
+  , Command "ssh" "SSH to a box."
+            (BoxSSH  <$> queryP <*> many sshArgP)
+
+  , Command "ls"  "List available boxes."
+            (BoxList <$> (queryP <|> pure matchAll))
+
+  ]
 
 hostTypeP :: Parser HostType
 hostTypeP =
@@ -258,3 +267,35 @@ filterCompleter = mkCompleter $ \arg -> do
   where
     tryFetchBoxes :: IO [Box]
     tryFetchBoxes = either (const []) id <$> runEitherT cachedBoxes
+
+
+------------------------------------------------------------------------
+-- Command Arguments
+--   This can be moved to X.Options.Applicative once we get it right.
+
+data Command a = Command {
+    _cmdLabel       :: Text
+  , _cmdDescription :: Text
+  , _cmdParser      :: Parser a
+  }
+
+data CompCommands a =
+    ZshCommands [Command a]
+  | Safe (SafeCommand a)
+
+commandsP :: [Command a] -> Parser (CompCommands a)
+commandsP commands =
+      ZshCommands commands <$ commandsFlag
+  <|> Safe <$> safeCommand cmdP
+  where
+    cmdP = subparser
+         . mconcat
+         . fmap fromCommand
+         $ commands
+
+commandsFlag :: Parser ()
+commandsFlag = flag' () (long "zsh-commands" <> hidden)
+
+fromCommand :: Command a -> Mod CommandFields a
+fromCommand (Command label description parser) =
+  command' (T.unpack label) (T.unpack description) parser
