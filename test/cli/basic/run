@@ -30,8 +30,19 @@ if $BOX ip mincom:hub; then exit 1; fi
 
 function check() {
   if [ "$1" != "$2" ]; then
-    echo "expected: $1"
-    echo " but was: $2"
+    BOX_TEMP=$(mktemp -d 2>/dev/null || mktemp -d -t 'box')
+    trap "rm -rf $BOX_TEMP" EXIT
+
+    EXPECT_PIPE=$BOX_TEMP/expected
+    ACTUAL_PIPE=$BOX_TEMP/actual
+
+    mkfifo $EXPECT_PIPE
+    mkfifo $ACTUAL_PIPE
+
+    echo "$1" > $EXPECT_PIPE &
+    echo "$2" > $ACTUAL_PIPE &
+
+    diff -u $EXPECT_PIPE $ACTUAL_PIPE
     exit 1
   fi
 }
@@ -46,4 +57,12 @@ check "$EXPECT" "$ACTUAL"
 
 EXPECT='ambiata'
 ACTUAL=$($BOX ls ambiata | tail -1 | awk '{print $1}' | head)
+check "$EXPECT" "$ACTUAL"
+
+EXPECT=$(cat <<'EOF'
+ip:Get the IP address of a box.
+ssh:SSH to a box.
+ls:List available boxes.
+EOF)
+ACTUAL=$($BOX --zsh-commands)
 check "$EXPECT" "$ACTUAL"
