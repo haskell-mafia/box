@@ -10,6 +10,3 @@
 [submodule "lib/mismi"]
 	path = lib/mismi
 	url = git@github.com:ambiata/mismi.git
-[submodule "lib/amazonka"]
-	path = lib/amazonka
-	url = git@github.com:ambiata/amazonka.git

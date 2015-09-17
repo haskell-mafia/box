@@ -7,25 +7,28 @@ module Test.IO.Box.Store where
 import           Box.Data
 import           Box.Store
 
-import           Disorder.Core.IO
+import           Control.Monad.Trans.Either
+
+import qualified Data.Text as T
 
 import           P
 
-import           System.IO.Temp
+import           System.IO (IO)
 
 import           Test.Box.Arbitrary ()
 import           Test.Mismi.S3
+import           Test.Mismi.Amazonka
 import           Test.QuickCheck
+import           Test.QuickCheck.Property (failed)
 
 
-prop_readwrite_s3 t bs = testIO . runS3WithDefaults $
-  withToken t (writeReadBoxes bs . BoxStoreS3)
+prop_readwrite_s3 bs = withAWS (writeReadBoxes bs . BoxStoreS3)
 
-prop_readwrite_local bs = testIO . withSystemTempDirectory "box" $
-  runS3WithDefaults . writeReadBoxes bs . BoxStoreLocal . (<> "/file")
+prop_readwrite_local bs = withLocalAWS $ \path _ -> do
+  writeReadBoxes bs . BoxStoreLocal . (<> "/file") $ path
 
 
-writeReadBoxes :: [Box] -> BoxStore -> S3Action Property
+writeReadBoxes :: [Box] -> BoxStore -> AWS Property
 writeReadBoxes bs f = do
   writeBoxes bs f
   bs' <- readBoxes f
