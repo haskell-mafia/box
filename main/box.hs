@@ -2,14 +2,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module Main (main) where
 
-import           BuildInfo_box
+import           BuildInfo_ambiata_box
 
 import           Box hiding ((</>))
 
-import qualified Control.Arrow as Arrow
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Either
 
@@ -52,10 +52,10 @@ data HostType =
 type SSHArg = Text
 
 data BoxCommandError =
-    BoxError BoxError
+    BoxError    BoxError
+  | BoxAwsError Error
   | BoxNoFilter
   | BoxNoMatches
-  deriving (Eq, Show)
 
 
 ------------------------------------------------------------------------
@@ -171,11 +171,18 @@ cachedBoxes = do
 
 fetchBoxes :: EitherT BoxCommandError IO [Box]
 fetchBoxes = do
-  store <- liftIO storeEnv
-  boxes <- EitherT (Arrow.left BoxError <$> runS3WithDefaults (readBoxes store))
-  path  <- liftIO cacheEnv
-  liftIO (writeCache path boxes)
-  return boxes
+    -- We don't want people setting a default AWS region
+    -- on their local machine, use Sydney instead.
+    mregion <- getRegionFromEnv
+    env     <- newEnv (fromMaybe Sydney mregion) Discover
+    store   <- liftIO storeEnv
+    boxes   <- squash (runAWST env (readBoxes store))
+    path    <- liftIO cacheEnv
+    liftIO (writeCache path boxes)
+    return boxes
+  where
+    squash x = bimapEitherT BoxError    id . hoistEither
+           =<< bimapEitherT BoxAwsError id x
 
 randomBoxOfQuery :: MonadIO m => Query -> [Box] -> EitherT BoxCommandError m Box
 randomBoxOfQuery q bs = do
@@ -187,9 +194,10 @@ selectHost InternalHost = boxHost
 selectHost ExternalHost = boxPublicHost
 
 boxCommandErrorRender :: BoxCommandError -> Text
-boxCommandErrorRender (BoxError e)   = boxErrorRender e
-boxCommandErrorRender (BoxNoFilter)  = "No filter specified"
-boxCommandErrorRender (BoxNoMatches) = "No matching boxes found"
+boxCommandErrorRender (BoxError e)    = boxErrorRender e
+boxCommandErrorRender (BoxAwsError e) = errorRender e
+boxCommandErrorRender (BoxNoFilter)   = "No filter specified"
+boxCommandErrorRender (BoxNoMatches)  = "No matching boxes found"
 
 exec :: Text -> [Text] -> IO a
 exec cmd args = executeFile (T.unpack cmd) True (fmap T.unpack args) Nothing

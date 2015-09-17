@@ -13,6 +13,7 @@ description:           box
 library
   build-depends:
                        base                            >= 3          && < 5
+                     , ambiata-mismi-core
                      , ambiata-mismi-s3
                      , ambiata-p
                      , attoparsec                      == 0.12.*
@@ -31,7 +32,7 @@ library
                        src
 
   exposed-modules:
-                       Paths_box
+                       Paths_ambiata_box
                        Box
                        Box.Completion
                        Box.Cache
@@ -85,6 +86,7 @@ test-suite test-io
                      , ambiata-mismi-s3
                      , ambiata-mismi-s3-test
                      , ambiata-p
+                     , either                          == 4.3.*
                      , QuickCheck                      == 2.7.*
                      , quickcheck-instances            == 0.3.*
                      , temporary                       == 1.2.*
