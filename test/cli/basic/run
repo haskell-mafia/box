@@ -47,7 +47,7 @@ function check() {
   fi
 }
 
-EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' '$BOX_USER'@54.1.1.6 nc %h %p 2>/dev/null","-o","HostKeyAlias=box.acme.lab.kermit.brown.717.i-a6g1d97a.jump","'$BOX_USER'@192.31.14.3"]'
+EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o HostKeyAlias=box.ambiata.gateway.apple.gray.7.i-fe6988ed.jump '$BOX_USER'@54.1.1.6 nc %h %p 2>/dev/null","-o","HostKeyAlias=box.acme.lab.kermit.brown.717.i-a6g1d97a.jump","'$BOX_USER'@192.31.14.3"]'
 ACTUAL=$($BOX --dry-run ssh acme:lab)
 check "$EXPECT" "$ACTUAL"
 

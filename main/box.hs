@@ -101,12 +101,14 @@ boxSSH :: RunType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
 boxSSH runType qTarget args boxes = do
   let qGateway = Query ExactAll (Exact (Flavour "gateway")) InfixAll ExactAll
 
-  t <- randomBoxOfQuery qTarget  boxes
-  g <- randomBoxOfQuery qGateway boxes
+  target  <- randomBoxOfQuery qTarget  boxes
+  gateway <- randomBoxOfQuery qGateway boxes
 
-  let targetHost  = unHost (selectHost InternalHost t)
-  let targetName  = unName (boxName t) <> "." <> unInstanceId (boxInstance t)
-  let gatewayHost = unHost (selectHost ExternalHost g)
+  let boxNiceName b = unName (boxName b) <> "." <> unInstanceId (boxInstance b)
+      boxAlias    b = "box." <> boxNiceName b <> ".jump"
+
+  let targetHost  = unHost (selectHost InternalHost target)
+      gatewayHost = unHost (selectHost ExternalHost gateway)
 
   user     <- liftIO userEnv
   identity <- liftIO identityEnv
@@ -115,12 +117,13 @@ boxSSH runType qTarget args boxes = do
                 -- netcat's stderr to /dev/null to avoid the annoying 'Killed
                 -- by signal 1.' message when the session finishes.
                 "-o", "ProxyCommand=ssh" <> " -i " <> identity
+                                         <> " -o HostKeyAlias=" <> boxAlias gateway
                                          <> " " <> user <> "@" <> gatewayHost
                                          <> " nc %h %p 2>/dev/null"
 
                 -- Keep track of host keys using the target's somewhat unique
                 -- name.
-              , "-o", "HostKeyAlias=box." <> targetName <> ".jump"
+              , "-o", "HostKeyAlias=" <> boxAlias target
 
                 -- Connect to target box.
               , user <> "@" <> targetHost
@@ -134,7 +137,7 @@ boxSSH runType qTarget args boxes = do
 
     RealRun -> do
       -- Set the title of the terminal.
-      liftIO (T.putStr ("\ESC]0;" <> targetName <> "\BEL"))
+      liftIO (T.putStr ("\ESC]0;" <> boxNiceName target <> "\BEL"))
       liftIO (hFlush stdout)
 
       -- This call never returns, the current process is replaced by 'ssh'.
