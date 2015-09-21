@@ -14,6 +14,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Either
 
+import qualified Data.Attoparsec.Text as A
 import           Data.List (sort)
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -119,8 +120,8 @@ boxSSH runType qTarget args boxes = do
 
     RealRun -> do
       -- Set the title of the terminal.
---      liftIO (T.putStr ("\ESC]0;" <> boxNiceName target <> "\BEL")) -- FIX
-      liftIO (hFlush stdout)
+--      liftIO (T.putStr ("\ESC]0;" <> boxNiceName target <> "\BEL"))
+--      liftIO (hFlush stdout)
 
       -- This call never returns, the current process is replaced by 'ssh'.
       liftIO (exec "ssh" args')
@@ -144,8 +145,13 @@ boxList q boxes = liftIO $ do
 -- do it
 -- box ssh :hub:thog.purple.542:i-dbd61c04 'cat file.pdf' | open -f -a /Applications/Preview.app
 boxPreview :: RunType -> Query -> Source -> [Box] -> EitherT BoxCommandError IO ()
-boxPreview _ q _ boxes = do
-  args <- generateArgs q ["cat ~/file.pdf"] boxes
+boxPreview _ q s boxes = do
+  let sshargs = case s of
+        LocalSource fp ->
+          ["cat", T.pack fp]
+        S3Source a ->
+          ["s3", "cat", addressToText a]
+  args <- generateArgs q sshargs boxes
   (_, Just hout, _, h) <- lift $ createProcess (proc "ssh" $ fmap T.unpack args) { std_out = CreatePipe }
   (_, _, _, h2) <- lift $ createProcess (proc "open"  ["-f", "-a", "/Applications/Preview.app"]) { std_in = UseHandle hout }
   e <- lift $ waitForProcess h2
@@ -156,6 +162,9 @@ boxPreview _ q _ boxes = do
 ------------------------------------------------------------------------
 -- Utils
 
+boxNiceName :: Box -> Text
+boxNiceName b =
+  unName (boxName b) <> "." <> unInstanceId (boxInstance b)
 
 generateArgs :: Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO [Text]
 generateArgs qTarget args boxes = do
@@ -164,8 +173,7 @@ generateArgs qTarget args boxes = do
   target  <- randomBoxOfQuery qTarget  boxes
   gateway <- randomBoxOfQuery qGateway boxes
 
-  let boxNiceName b = unName (boxName b) <> "." <> unInstanceId (boxInstance b)
-      boxAlias    b = "box." <> boxNiceName b <> ".jump"
+  let boxAlias    b = "box." <> boxNiceName b <> ".jump"
 
   let targetHost  = unHost (selectHost InternalHost target)
       gatewayHost = unHost (selectHost ExternalHost gateway)
@@ -306,19 +314,9 @@ sshArgP =
 
 sourceP :: Parser Source
 sourceP =
---      S3Source <$> addressP
---  <|> LocalSource <$> filepathP
-  LocalSource <$> filepathP
-{-
-addressP :: Parser Address
-addressP = argument (pOption s3Parser) $
-     metavar "S3URI"
-  <> help "An s3 uri, i.e. s3://bucket/prefix/key"
--}
-filepathP :: Parser FilePath
-filepathP = strArgument $
-     metavar "FILEPATH"
-  <> help "Absolute file path, i.e. /tmp/fred"
+  argument (pOption $ fmap S3Source s3Parser <|> fmap (LocalSource . T.unpack) A.takeText) $
+     metavar "SOURCE"
+  <> help "An s3 uri or absolute file path, i.e. s3://bucket/prefix/key"
 
 filterCompleter :: Completer
 filterCompleter = mkCompleter $ \arg -> do
