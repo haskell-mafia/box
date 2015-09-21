@@ -59,6 +59,7 @@ executable             box
                      , time                            >= 1.4        && < 1.6
                      , transformers                    >= 0.3        && < 0.5
                      , unix                            == 2.7.*
+                     , process                         == 1.2.*
 
 test-suite test
   type:                exitcode-stdio-1.0
