@@ -151,9 +151,12 @@ boxPreview _ q s boxes = do
           ["cat", T.pack fp]
         S3Source a ->
           ["s3", "cat", addressToText a]
+
   args <- generateArgs q sshargs boxes
+
   (_, Just hout, _, h) <- lift $ createProcess (proc "ssh" $ fmap T.unpack args) { std_out = CreatePipe }
   (_, _, _, h2) <- lift $ createProcess (proc "open"  ["-f", "-a", "/Applications/Preview.app"]) { std_in = UseHandle hout }
+
   e <- lift $ waitForProcess h2
   lift $ terminateProcess h
   lift $ exitWith e
