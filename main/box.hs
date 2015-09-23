@@ -118,7 +118,7 @@ boxIP _ q hostType boxes = do
 
 boxSSH :: RunType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
 boxSSH runType qTarget args boxes = do
-  args' <- generateArgs qTarget args boxes
+  (args', target) <- generateArgs qTarget args boxes
 
   case runType of
     DryRun  ->
@@ -126,8 +126,8 @@ boxSSH runType qTarget args boxes = do
 
     RealRun -> do
       -- Set the title of the terminal.
---      liftIO (T.putStr ("\ESC]0;" <> boxNiceName target <> "\BEL"))
---      liftIO (hFlush stdout)
+      liftIO (T.putStr ("\ESC]0;" <> boxNiceName target <> "\BEL"))
+      liftIO (hFlush stdout)
 
       -- This call never returns, the current process is replaced by 'ssh'.
       liftIO (exec "ssh" args')
@@ -158,7 +158,7 @@ boxPreview _ q s o boxes = do
         S3Source a ->
           ["s3", "cat", addressToText a]
 
-  args <- generateArgs q sshargs boxes
+  (args, _) <- generateArgs q sshargs boxes
 
   (_, Just hout, _, h) <- lift $ createProcess (proc "ssh" $ fmap T.unpack args) { std_out = CreatePipe }
   (_, _, _, h2) <- lift $ createProcess (proc "open" $ ["-f"] <> openArguments) { std_in = UseHandle hout }
@@ -180,7 +180,7 @@ boxNiceName :: Box -> Text
 boxNiceName b =
   unName (boxName b) <> "." <> unInstanceId (boxInstance b)
 
-generateArgs :: Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO [Text]
+generateArgs :: Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ([Text], Box)
 generateArgs qTarget args boxes = do
   let qGateway = Query ExactAll (Exact (Flavour "gateway")) InfixAll ExactAll
 
@@ -195,7 +195,7 @@ generateArgs qTarget args boxes = do
   user     <- liftIO userEnv
   identity <- liftIO identityEnv
 
-  pure $ [ -- ProxyCommand bounces us off the gateway. Note that we pipe
+  pure ( [ -- ProxyCommand bounces us off the gateway. Note that we pipe
            -- netcat's stderr to /dev/null to avoid the annoying 'Killed
            -- by signal 1.' message when the session finishes.
            "-o", "ProxyCommand=ssh" <> " -i " <> identity
@@ -211,7 +211,7 @@ generateArgs qTarget args boxes = do
            , user <> "@" <> targetHost
 
            -- Pass on any additional arguments to 'ssh'.
-           ] <> args
+           ] <> args , target)
 
 
 
