@@ -137,8 +137,10 @@ boxSSH runType qTarget args boxes = do
 
     RealRun -> do
       -- Set the title of the terminal.
-      liftIO (T.putStr ("\ESC]0;" <> boxNiceName target <> "\BEL"))
-      liftIO (hFlush stdout)
+      tty <- liftIO (hIsTerminalDevice stdout)
+      when tty . liftIO $ do
+        T.putStr ("\ESC]0;" <> boxNiceName target <> "\BEL")
+        hFlush stdout
 
       -- This call never returns, the current process is replaced by 'ssh'.
       liftIO (exec "ssh" args')
