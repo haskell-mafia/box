@@ -5,6 +5,7 @@ BOX=${1:-./dist/build/box/box}
 export BOX_STORE=test/cli/basic/v2
 export BOX_USER=pwadler
 export BOX_IDENTITY=~/.ssh/endofunctor_rsa
+export BOX_ANSI_ESCAPES=0
 
 $BOX -v
 
