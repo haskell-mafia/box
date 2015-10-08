@@ -57,6 +57,9 @@ data BoxCommandError =
   | BoxNoFilter
   | BoxNoMatches
 
+data ANSIEscapes =
+    EnableANSIEscapes
+  | DisableANSIEscapes
 
 ------------------------------------------------------------------------
 -- Main
@@ -137,8 +140,12 @@ boxSSH runType qTarget args boxes = do
 
     RealRun -> do
       -- Set the title of the terminal.
-      liftIO (T.putStr ("\ESC]0;" <> boxNiceName target <> "\BEL"))
-      liftIO (hFlush stdout)
+      ansi <- liftIO ansiEscapesEnv
+      case ansi of
+        DisableANSIEscapes -> return ()
+        EnableANSIEscapes  -> liftIO $ do
+          T.putStr ("\ESC]0;" <> boxNiceName target <> "\BEL")
+          hFlush stdout
 
       -- This call never returns, the current process is replaced by 'ssh'.
       liftIO (exec "ssh" args')
@@ -227,6 +234,13 @@ cacheEnv :: IO FilePath
 cacheEnv = do
   home <- getHomeDirectory
   fromMaybe (home </> ".ambiata/box/cache") <$> lookupEnv "BOX_CACHE"
+
+ansiEscapesEnv :: IO ANSIEscapes
+ansiEscapesEnv = do
+  tty <- liftIO (hIsTerminalDevice stdout)
+  ok  <- (/= "0") . fromMaybe "1" <$> lookupEnv "BOX_ANSI_ESCAPES"
+  return (if tty && ok then EnableANSIEscapes
+                       else DisableANSIEscapes)
 
 
 ------------------------------------------------------------------------
