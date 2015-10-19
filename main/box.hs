@@ -1,8 +1,9 @@
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE PatternGuards       #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE StandaloneDeriving  #-}
 
 module Main (main) where
 
@@ -11,8 +12,10 @@ import           BuildInfo_ambiata_box
 import           Box hiding ((</>))
 
 import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Either
 
+import qualified Data.Attoparsec.Text as A
 import           Data.List (sort)
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -29,6 +32,7 @@ import           System.FilePath ((</>))
 import           System.IO
 import           System.Posix.Process
 import           System.Posix.User
+import           System.Process hiding (runCommand, env)
 
 import           Text.PrettyPrint.Boxes ((<+>))
 import qualified Text.PrettyPrint.Boxes as PB
@@ -42,6 +46,17 @@ data BoxCommand =
     BoxIP   Query HostType
   | BoxSSH  Query [SSHArg]
   | BoxList Query
+  | BoxPreview Query Source OpenWith
+  deriving (Eq, Show)
+
+data Source =
+    LocalSource FilePath
+  | S3Source Address
+  deriving (Eq, Show)
+
+data OpenWith =
+    OpenApplication Text
+  | DefaultEditor
   deriving (Eq, Show)
 
 data HostType =
@@ -79,11 +94,15 @@ main = do
       putStrLn (prog <> ": " <> buildInfoVersion)
       exitSuccess
 
-    Safe (RunCommand r cmd) -> do
-      case cmd of
-        BoxIP   q host -> runCommand (boxIP  r q host)
-        BoxSSH  q args -> runCommand (boxSSH r q args)
-        BoxList q      -> runCommand (boxList q)
+    Safe (RunCommand r cmd) -> case cmd of
+      BoxIP q host ->
+        runCommand (boxIP  r q host)
+      BoxSSH q args ->
+        runCommand (boxSSH r q args)
+      BoxList q ->
+        runCommand (boxList q)
+      BoxPreview q s a ->
+        runCommand (boxPreview r q s a)
 
 runCommand :: ([Box] -> EitherT BoxCommandError IO ()) -> IO ()
 runCommand cmd = orDie boxCommandErrorRender $ do
@@ -102,37 +121,7 @@ boxIP _ q hostType boxes = do
 
 boxSSH :: RunType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
 boxSSH runType qTarget args boxes = do
-  let qGateway = Query ExactAll (Exact (Flavour "gateway")) InfixAll ExactAll
-
-  target  <- randomBoxOfQuery qTarget  boxes
-  gateway <- randomBoxOfQuery qGateway boxes
-
-  let boxNiceName b = unName (boxName b) <> "." <> unInstanceId (boxInstance b)
-      boxAlias    b = "box." <> boxNiceName b <> ".jump"
-
-  let targetHost  = unHost (selectHost InternalHost target)
-      gatewayHost = unHost (selectHost ExternalHost gateway)
-
-  user     <- liftIO userEnv
-  identity <- liftIO identityEnv
-
-  let args' = [ -- ProxyCommand bounces us off the gateway. Note that we pipe
-                -- netcat's stderr to /dev/null to avoid the annoying 'Killed
-                -- by signal 1.' message when the session finishes.
-                "-o", "ProxyCommand=ssh" <> " -i " <> identity
-                                         <> " -o HostKeyAlias=" <> boxAlias gateway
-                                         <> " " <> user <> "@" <> gatewayHost
-                                         <> " nc %h %p 2>/dev/null"
-
-                -- Keep track of host keys using the target's somewhat unique
-                -- name.
-              , "-o", "HostKeyAlias=" <> boxAlias target
-
-                -- Connect to target box.
-              , user <> "@" <> targetHost
-
-                -- Pass on any additional arguments to 'ssh'.
-              ] <> args
+  (args', target) <- generateArgs qTarget args boxes
 
   case runType of
     DryRun  ->
@@ -166,9 +155,72 @@ boxList q boxes = liftIO $ do
 
     (<++>) l r = l PB.<> PB.emptyBox 0 2 PB.<> r
 
+-- do it
+-- box ssh :hub:thog.purple.542:i-dbd61c04 'cat file.pdf' | open -f -a /Applications/Preview.app
+boxPreview :: RunType -> Query -> Source -> OpenWith -> [Box] -> EitherT BoxCommandError IO ()
+boxPreview _ q s o boxes = do
+  let sshargs = case s of
+        LocalSource fp ->
+          ["cat", T.pack fp]
+        S3Source a ->
+          ["s3", "cat", addressToText a]
 
+  (args, _) <- generateArgs q sshargs boxes
+
+  (_, Just hout, _, h) <- lift $ createProcess (proc "ssh" $ fmap T.unpack args) { std_out = CreatePipe }
+  (_, _, _, h2) <- lift $ createProcess (proc "open" $ ["-f"] <> openArguments) { std_in = UseHandle hout }
+
+  e <- lift $ waitForProcess h2
+  lift $ terminateProcess h
+  lift $ exitWith e
+    where
+      openArguments | OpenApplication a <- o
+                    = ["-a", T.unpack a]
+                    | DefaultEditor <- o
+                    = ["-t"]
+                    | otherwise
+                    = []
 ------------------------------------------------------------------------
 -- Utils
+
+boxNiceName :: Box -> Text
+boxNiceName b =
+  unName (boxName b) <> "." <> unInstanceId (boxInstance b)
+
+generateArgs :: Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ([Text], Box)
+generateArgs qTarget args boxes = do
+  let qGateway = Query ExactAll (Exact (Flavour "gateway")) InfixAll ExactAll
+
+  target  <- randomBoxOfQuery qTarget  boxes
+  gateway <- randomBoxOfQuery qGateway boxes
+
+  let boxAlias    b = "box." <> boxNiceName b <> ".jump"
+
+  let targetHost  = unHost (selectHost InternalHost target)
+      gatewayHost = unHost (selectHost ExternalHost gateway)
+
+  user     <- liftIO userEnv
+  identity <- liftIO identityEnv
+
+  pure ( [ -- ProxyCommand bounces us off the gateway. Note that we pipe
+           -- netcat's stderr to /dev/null to avoid the annoying 'Killed
+           -- by signal 1.' message when the session finishes.
+           "-o", "ProxyCommand=ssh" <> " -i " <> identity
+                                    <> " -o HostKeyAlias=" <> boxAlias gateway
+                                    <> " " <> user <> "@" <> gatewayHost
+                                    <> " nc %h %p 2>/dev/null"
+
+           -- Keep track of host keys using the target's somewhat unique
+           -- name.
+           , "-o", "HostKeyAlias=" <> boxAlias target
+
+           -- Connect to target box.
+           , user <> "@" <> targetHost
+
+           -- Pass on any additional arguments to 'ssh'.
+           ] <> args , target)
+
+
 
 cachedBoxes :: EitherT BoxCommandError IO [Box]
 cachedBoxes = do
@@ -210,7 +262,8 @@ boxCommandErrorRender (BoxNoFilter)   = "No filter specified"
 boxCommandErrorRender (BoxNoMatches)  = "No matching boxes found"
 
 exec :: Text -> [Text] -> IO a
-exec cmd args = executeFile (T.unpack cmd) True (fmap T.unpack args) Nothing
+exec cmd args =
+  executeFile (T.unpack cmd) True (fmap T.unpack args) Nothing
 
 
 ------------------------------------------------------------------------
@@ -247,7 +300,8 @@ ansiEscapesEnv = do
 -- Argument Parsing
 
 boxP :: Parser (CompCommands BoxCommand)
-boxP = commandsP boxCommands
+boxP =
+  commandsP boxCommands
 
 boxCommands :: [Command BoxCommand]
 boxCommands =
@@ -260,6 +314,8 @@ boxCommands =
   , Command "ls"  "List available boxes."
             (BoxList <$> (queryP <|> pure matchAll))
 
+  , Command "preview"  "Preview a file from a box."
+            (BoxPreview <$> (queryP <|> pure matchAll) <*> sourceP <*> (isTextFileP <|> applicationP))
   ]
 
 hostTypeP :: Parser HostType
@@ -283,6 +339,33 @@ sshArgP =
   argument textRead $
        metavar "SSH_ARGUMENTS"
     <> help "Extra arguments to pass to ssh."
+
+sourceP :: Parser Source
+sourceP =
+  argument (pOption $ fmap S3Source s3Parser <|> fmap (LocalSource . T.unpack) A.takeText) $
+     metavar "SOURCE"
+  <> help "An s3 uri or absolute file path, i.e. s3://bucket/prefix/key"
+
+isTextFileP :: Parser OpenWith
+isTextFileP =
+  flag' DefaultEditor $
+     short 't'
+  <> long  "text"
+  <> help  "Open with default editor"
+  <> hidden
+
+applicationP :: Parser OpenWith
+applicationP =
+  fmap OpenApplication $
+  option textRead $
+     short 'a'
+  <> long  "app"
+  <> metavar "APP"
+  <> help  "A path to an Application bundle."
+  <> value "/Applications/Preview.app/"
+  <> showDefault
+  <> action "file"
+  <> hidden
 
 filterCompleter :: Completer
 filterCompleter = mkCompleter $ \arg -> do
