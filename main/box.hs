@@ -40,7 +40,7 @@ import           X.Options.Applicative
 
 data BoxCommand =
     BoxIP   Query HostType
-  | BoxSSH  Query [SSHArg]
+  | BoxSSH  GatewayType Query [SSHArg]
   | BoxList Query
   deriving (Eq, Show)
 
@@ -82,7 +82,7 @@ main = do
     Safe (RunCommand r cmd) -> do
       case cmd of
         BoxIP   q host -> runCommand (boxIP  r q host)
-        BoxSSH  q args -> runCommand (boxSSH r q args)
+        BoxSSH  g q args -> runCommand (boxSSH r g q args)
         BoxList q      -> runCommand (boxList q)
 
 runCommand :: ([Box] -> EitherT BoxCommandError IO ()) -> IO ()
@@ -100,9 +100,9 @@ boxIP _ q hostType boxes = do
   b <- randomBoxOfQuery q boxes
   liftIO (putStrLn . T.unpack . unHost . selectHost hostType $ b)
 
-boxSSH :: RunType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
-boxSSH runType qTarget args boxes = do
-  let qGateway = Query ExactAll (Exact (Flavour "gateway")) InfixAll ExactAll
+boxSSH :: RunType -> GatewayType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
+boxSSH runType gwType qTarget args boxes = do
+  let qGateway = Query ExactAll (Exact $ gatewayFlavour gwType) InfixAll ExactAll
 
   target  <- randomBoxOfQuery qTarget  boxes
   gateway <- randomBoxOfQuery qGateway boxes
@@ -255,7 +255,7 @@ boxCommands =
             (BoxIP   <$> queryP <*> hostTypeP)
 
   , Command "ssh" "SSH to a box."
-            (BoxSSH  <$> queryP <*> many sshArgP)
+            (BoxSSH  <$> gatewayP <*> queryP <*> many sshArgP)
 
   , Command "ls"  "List available boxes."
             (BoxList <$> (queryP <|> pure matchAll))
@@ -267,6 +267,13 @@ hostTypeP =
   flag InternalHost ExternalHost $
        long "external"
     <> help "Display the external ip address rather than the internal one (which is the default)."
+
+gatewayP :: Parser GatewayType
+gatewayP =
+  flag Gateway GatewaySecure $
+       long "secure"
+    <> short 's'
+    <> help "Use a 2FA-enabled gateway."
 
 queryP :: Parser Query
 queryP =

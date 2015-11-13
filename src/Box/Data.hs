@@ -14,6 +14,7 @@ module Box.Data (
   , Name (..)
   , Client (..)
   , Flavour (..)
+  , GatewayType (..)
   , BoxError (..)
   , queryHasMatch
   , queryFromText
@@ -28,6 +29,7 @@ module Box.Data (
   , boxParser
   , boxErrorRender
   , selectRandomBox
+  , gatewayFlavour
   ) where
 
 import           Data.Attoparsec.Text as AP
@@ -105,6 +107,12 @@ data BoxError =
   | BoxParseError Text
   deriving (Eq, Show)
 
+data GatewayType =
+    -- | Uses single-factor pubkey authentication.
+    Gateway
+    -- | Uses pubkey authentication + TOTP.
+  | GatewaySecure
+  deriving (Eq, Show)
 
 ------------------------------------------------------------------------
 -- Query
@@ -250,3 +258,7 @@ boxErrorRender (BoxParseError e) =
 selectRandomBox :: [Box] -> IO (Maybe Box)
 selectRandomBox =
   fmap listToMaybe . shuffleM
+
+gatewayFlavour :: GatewayType -> Flavour
+gatewayFlavour Gateway       = Flavour "gateway"
+gatewayFlavour GatewaySecure = Flavour "gatewaysecure"
