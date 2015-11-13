@@ -60,6 +60,10 @@ EXPECT='ambiata'
 ACTUAL=$($BOX ls ambiata | tail -1 | awk '{print $1}' | head)
 check "$EXPECT" "$ACTUAL"
 
+EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o HostKeyAlias=box.ambiata.gatewaysecure.asg.gatewaysecure.muppets.1eb8c31e604a2e35950ae4008b1114d6.i-8e124d51.jump '$BOX_USER'@54.1.1.8 nc %h %p 2>/dev/null","-o","HostKeyAlias=box.acme.lab.kermit.brown.717.i-a6g1d97a.jump","'$BOX_USER'@192.31.14.3"]'
+ACTUAL=$($BOX --dry-run ssh -s acme:lab)
+check "$EXPECT" "$ACTUAL"
+
 EXPECT=$(cat <<'EOF'
 ip:Get the IP address of a box.
 ssh:SSH to a box.
