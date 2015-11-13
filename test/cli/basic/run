@@ -68,6 +68,7 @@ EXPECT=$(cat <<'EOF'
 ip:Get the IP address of a box.
 ssh:SSH to a box.
 ls:List available boxes.
-EOF)
+EOF
+)
 ACTUAL=$($BOX --zsh-commands)
 check "$EXPECT" "$ACTUAL"
