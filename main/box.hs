@@ -39,9 +39,11 @@ import           X.Options.Applicative
 -- Types
 
 data BoxCommand =
-    BoxIP   Query HostType
-  | BoxSSH  GatewayType Query [SSHArg]
-  | BoxList Query
+    BoxIP    Query HostType
+  | BoxSSH   GatewayType Query [SSHArg]
+  | BoxRSH   GatewayType Query [SSHArg]
+  | BoxRSync GatewayType Query [SSHArg]
+  | BoxList  Query
   deriving (Eq, Show)
 
 data HostType =
@@ -56,6 +58,8 @@ data BoxCommandError =
   | BoxAwsError Error
   | BoxNoFilter
   | BoxNoMatches
+  | BoxMissingRSHHost
+  | BoxInvalidRSHHost Text
 
 data ANSIEscapes =
     EnableANSIEscapes
@@ -81,9 +85,11 @@ main = do
 
     Safe (RunCommand r cmd) -> do
       case cmd of
-        BoxIP   q host -> runCommand (boxIP  r q host)
-        BoxSSH  g q args -> runCommand (boxSSH r g q args)
-        BoxList q      -> runCommand (boxList q)
+        BoxIP     q host   -> runCommand (boxIP  r q host)
+        BoxSSH    g q args -> runCommand (boxSSH r g q args)
+        BoxRSH    g q args -> runCommand (boxRSH r g q args)
+        BoxRSync  g q args -> runCommand (const $ boxRSync r g q args)
+        BoxList   q        -> runCommand (boxList q)
 
 runCommand :: ([Box] -> EitherT BoxCommandError IO ()) -> IO ()
 runCommand cmd = orDie boxCommandErrorRender $ do
@@ -150,6 +156,27 @@ boxSSH runType gwType qTarget args boxes = do
       -- This call never returns, the current process is replaced by 'ssh'.
       liftIO (exec "ssh" args')
 
+boxRSH :: RunType -> GatewayType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
+boxRSH runType gwType qTarget args boxes = do
+  case args of
+    [] ->
+      left BoxMissingRSHHost
+    ("":xs) ->
+      boxSSH runType gwType qTarget xs boxes
+    (h:_) ->
+      left $ BoxInvalidRSHHost h
+
+boxRSync :: RunType -> GatewayType -> Query -> [SSHArg] -> EitherT BoxCommandError IO ()
+boxRSync runType gwType qTarget args = do
+  box <- liftIO getExecutablePath
+  let secure = if gwType == GatewaySecure then "--secure" else ""
+  let args' = [ "--rsh", T.intercalate " " [T.pack box, "rsh", secure, queryRender qTarget, "--"]] <> args
+  case runType of
+    DryRun  ->
+      liftIO (print ("rsync" : args'))
+    RealRun -> do
+      liftIO (exec "rsync" args')
+
 boxList :: Query -> [Box] -> EitherT BoxCommandError IO ()
 boxList q boxes = liftIO $ do
     putStrLn ("total " <> show (length sorted))
@@ -204,10 +231,12 @@ selectHost InternalHost = boxHost
 selectHost ExternalHost = boxPublicHost
 
 boxCommandErrorRender :: BoxCommandError -> Text
-boxCommandErrorRender (BoxError e)    = boxErrorRender e
-boxCommandErrorRender (BoxAwsError e) = errorRender e
-boxCommandErrorRender (BoxNoFilter)   = "No filter specified"
-boxCommandErrorRender (BoxNoMatches)  = "No matching boxes found"
+boxCommandErrorRender (BoxError e)          = boxErrorRender e
+boxCommandErrorRender (BoxAwsError e)       = errorRender e
+boxCommandErrorRender (BoxNoFilter)         = "No filter specified"
+boxCommandErrorRender (BoxNoMatches)        = "No matching boxes found"
+boxCommandErrorRender (BoxMissingRSHHost)   = "Expected rsync to pass an argument for the hostname"
+boxCommandErrorRender (BoxInvalidRSHHost _) = "Expected an empty host to be specified, i.e. box rsync <query> -- -aH local-file :remote-file."
 
 exec :: Text -> [Text] -> IO a
 exec cmd args = executeFile (T.unpack cmd) True (fmap T.unpack args) Nothing
@@ -252,13 +281,19 @@ boxP = commandsP boxCommands
 boxCommands :: [Command BoxCommand]
 boxCommands =
   [ Command "ip"  "Get the IP address of a box."
-            (BoxIP   <$> queryP <*> hostTypeP)
+            (BoxIP    <$> queryP <*> hostTypeP)
 
   , Command "ssh" "SSH to a box."
-            (BoxSSH  <$> gatewayP <*> queryP <*> many sshArgP)
+            (BoxSSH   <$> gatewayP <*> queryP <*> many sshArgP)
+
+  , Command "rsh" "SSH to a box with a shell interface compatible with rsync."
+            (BoxRSH   <$> gatewayP <*> queryP <*> many sshArgP )
+
+  , Command "rsync" "SSH to a box."
+            (BoxRSync <$> gatewayP <*> queryP <*> many sshArgP)
 
   , Command "ls"  "List available boxes."
-            (BoxList <$> (queryP <|> pure matchAll))
+            (BoxList  <$> (queryP <|> pure matchAll))
 
   ]
 
