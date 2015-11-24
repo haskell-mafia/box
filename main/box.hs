@@ -8,7 +8,7 @@ module Main (main) where
 
 import           BuildInfo_ambiata_box
 
-import           Box hiding ((</>))
+import           Box
 
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Either
@@ -25,7 +25,7 @@ import           P
 import           System.Directory
 import           System.Environment
 import           System.Exit
-import           System.FilePath ((</>))
+import           System.FilePath ((</>), (<.>), dropFileName)
 import           System.IO
 import           System.Posix.Process
 import           System.Posix.User
@@ -74,7 +74,8 @@ main :: IO ()
 main = do
   hSetBuffering stdout LineBuffering
   hSetBuffering stderr LineBuffering
-  dispatch boxP >>= \case
+
+  dispatch boxP >>= \(env, ccs) -> case ccs of
 
     ZshCommands cmds -> do
       forM_ cmds $ \(Command label desc _) ->
@@ -87,15 +88,15 @@ main = do
 
     Safe (RunCommand r cmd) -> do
       case cmd of
-        BoxIP     q host   -> runCommand (boxIP  r q host)
-        BoxSSH    g q args -> runCommand (boxSSH r g q args)
-        BoxRSH    g q args -> runCommand (boxRSH r g q args)
-        BoxRSync  g q args -> runCommand (const $ boxRSync r g q args)
-        BoxList   q        -> runCommand (boxList q)
+        BoxIP     q host   -> runCommand env (boxIP  r q host)
+        BoxSSH    g q args -> runCommand env (boxSSH r g q args)
+        BoxRSH    g q args -> runCommand env (boxRSH r g q args)
+        BoxRSync  g q args -> runCommand env (const $ boxRSync r g q args)
+        BoxList   q        -> runCommand env (boxList q)
 
-runCommand :: ([Box] -> EitherT BoxCommandError IO ()) -> IO ()
-runCommand cmd = orDie boxCommandErrorRender $ do
-  boxes <- fetchBoxes
+runCommand :: Environment -> ([Box] -> EitherT BoxCommandError IO ()) -> IO ()
+runCommand env cmd = orDie boxCommandErrorRender $ do
+  boxes <- fetchBoxes env
   cmd boxes
   liftIO exitSuccess
 
@@ -204,26 +205,40 @@ boxList q boxes = liftIO $ do
 cachedBoxes :: EitherT BoxCommandError IO [Box]
 cachedBoxes = do
   let timeout = 60 -- seconds
-  path  <- liftIO cacheEnv
+
+  env   <- liftIO getEnvFromArgs
+  path  <- liftIO (cacheEnv env)
   cache <- liftIO (readCache path timeout)
   case cache of
     Just boxes -> return boxes
-    Nothing    -> fetchBoxes
+    Nothing    -> fetchBoxes env
+  where
+    getEnvFromArgs = do
+      args <- getArgs
+      return $ getEnvArgs (filter (/= "--bash-completion-word") args)
+    getEnvArgs = \case
+      -- Grab the -e / --environment arg from inside a Completer
+      -- Awful hack, but Applicative gives us no choice
+      ("-e":env:_) -> SomeEnv (T.pack env)
+      ("--environment":env:_) -> SomeEnv (T.pack env)
+      ("--":_) -> DefaultEnv
+      (_:xs) -> getEnvArgs xs
+      [] -> DefaultEnv
 
-fetchBoxes :: EitherT BoxCommandError IO [Box]
-fetchBoxes = do
+
+fetchBoxes :: Environment -> EitherT BoxCommandError IO [Box]
+fetchBoxes en = do
     -- We don't want people setting a default AWS region
     -- on their local machine, use Sydney instead.
     mregion <- getRegionFromEnv
     env     <- newEnv (fromMaybe Sydney mregion) Discover
     store   <- liftIO storeEnv
-    boxes   <- squash (runAWST env (readBoxes store))
-    path    <- liftIO cacheEnv
+    boxes   <- squash (runAWST env (readBoxes store en))
+    path    <- liftIO (cacheEnv en)
     liftIO (writeCache path boxes)
     return boxes
-  where
-    squash x = bimapEitherT BoxError    id . hoistEither
-           =<< bimapEitherT BoxAwsError id x
+    where squash x = bimapEitherT BoxError    id . hoistEither
+                 =<< bimapEitherT BoxAwsError id x
 
 randomBoxOfQuery :: MonadIO m => Query -> [Box] -> EitherT BoxCommandError m Box
 randomBoxOfQuery q bs = do
@@ -252,8 +267,11 @@ exec cmd args = executeFile (T.unpack cmd) True (fmap T.unpack args) Nothing
 
 storeEnv :: IO BoxStore
 storeEnv =
-    fmap (maybe (BoxStoreS3 boxStoreAddress) (\s -> maybe (BoxStoreLocal s) BoxStoreS3 . addressFromText $ T.pack s))
-  $ lookupEnv "BOX_STORE"
+    -- Grab BOX_STORE from $ENV if defined, try to parse it as S3
+    let envStore = lookupEnv "BOX_STORE"
+        tryS3 s = maybe (BoxStoreLocal s)
+                         BoxStoreS3 . addressFromText $ T.pack s
+    in  fmap (maybe defaultBoxStore tryS3) envStore
 
 userEnv :: IO Text
 userEnv =
@@ -264,10 +282,14 @@ identityEnv = do
   home <- getHomeDirectory
   T.pack . fromMaybe (home </> ".ssh/ambiata_rsa") <$> lookupEnv "BOX_IDENTITY"
 
-cacheEnv :: IO FilePath
-cacheEnv = do
+cacheEnv :: Environment -> IO FilePath
+cacheEnv env = do
+  -- Cache each environment separately
   home <- getHomeDirectory
-  fromMaybe (home </> ".ambiata/box/cache") <$> lookupEnv "BOX_CACHE"
+  baseCache <- fromMaybe (home </> ".ambiata/box/cache") <$> lookupEnv "BOX_CACHE"
+  return $ case env of
+    DefaultEnv  -> baseCache
+    (SomeEnv e) -> dropFileName baseCache </> T.unpack e <.> "cache"
 
 ansiEscapesEnv :: IO ANSIEscapes
 ansiEscapesEnv = do
@@ -280,8 +302,18 @@ ansiEscapesEnv = do
 ------------------------------------------------------------------------
 -- Argument Parsing
 
-boxP :: Parser (CompCommands BoxCommand)
-boxP = commandsP boxCommands
+boxP :: Parser (Environment, CompCommands BoxCommand)
+boxP = (,) <$> envP <*> commandsP boxCommands
+
+envP :: Parser Environment
+envP = option readEnv $
+     metavar "ENV"
+  <> help "Use an alternate box store / environment"
+  <> short 'e'
+  <> long "environment"
+  <> completer envCompleter
+  <> value DefaultEnv
+  where readEnv = SomeEnv <$> textRead
 
 boxCommands :: [Command BoxCommand]
 boxCommands =
@@ -340,6 +372,13 @@ filterCompleter = mkCompleter $ \arg -> do
     tryFetchBoxes :: IO [Box]
     tryFetchBoxes = either (const []) id <$> runEitherT cachedBoxes
 
+envCompleter :: Completer
+envCompleter = mkCompleter $ \arg -> do
+  mregion <- getRegionFromEnv
+  awsEnv  <- newEnv (fromMaybe Sydney mregion) Discover
+  store   <- storeEnv
+  envs    <- runAWS awsEnv (listEnvironments store)
+  return . fmap T.unpack $ filter ((T.pack arg) `T.isPrefixOf`) envs
 
 ------------------------------------------------------------------------
 -- Command Arguments

@@ -22,8 +22,8 @@ prop_readwrite_local bs = withLocalAWS $ \path _ -> do
 
 writeReadBoxes :: [Box] -> BoxStore -> AWS Property
 writeReadBoxes bs f = do
-  writeBoxes bs f
-  bs' <- readBoxes f
+  writeBoxes bs f DefaultEnv
+  bs' <- readBoxes f DefaultEnv
   pure $ bs' === Right bs
 
 

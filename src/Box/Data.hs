@@ -16,6 +16,7 @@ module Box.Data (
   , Flavour (..)
   , GatewayType (..)
   , BoxError (..)
+  , Environment (..)
   , queryHasMatch
   , queryFromText
   , queryParser
@@ -112,6 +113,11 @@ data GatewayType =
     Gateway
     -- | Uses pubkey authentication + TOTP.
   | GatewaySecure
+  deriving (Eq, Show)
+
+data Environment =
+    SomeEnv Text
+  | DefaultEnv
   deriving (Eq, Show)
 
 ------------------------------------------------------------------------

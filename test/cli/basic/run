@@ -74,3 +74,67 @@ EOF
 )
 ACTUAL=$($BOX --zsh-commands)
 check "$EXPECT" "$ACTUAL"
+
+# Test -e flag is parsed correctly
+echo "Testing -e flag parses correctly..."
+EXPECT=$($BOX --help 2>&1)
+ACTUAL=$($BOX -e altenv --help 2>&1)
+check "$EXPECT" "$ACTUAL"
+
+EXPECT=$($BOX --help 2>&1)
+ACTUAL=$($BOX --environment customenv --help 2>&1)
+check "$EXPECT" "$ACTUAL"
+
+EXPECT=$($BOX --environment altenv ls)
+ACTUAL=$($BOX -e altenv ls)
+check "$EXPECT" "$ACTUAL"
+
+ACTUAL=$($BOX ls -e altenv)
+check "$EXPECT" "$ACTUAL"
+
+# Test that bad env args don't run
+echo "Testing invalid environment arg..."
+EXPECT="Could not find the box file located at"
+ACTUAL=$($BOX -e badenv ls 2>&1 | cut -d':' -f1)
+check "$EXPECT" "$ACTUAL"
+
+ACTUAL=$($BOX ls --environment badenv 2>&1 | cut -d':' -f1)
+check "$EXPECT" "$ACTUAL"
+
+# Test we get the correct set of values from altenv
+echo "Testing with alt environment..."
+
+CMD="$BOX -e altenv ip ambiata:totpadmin"
+EXPECT="172.131.113.24"
+echo $CMD
+ACTUAL=$($CMD)
+check "$EXPECT" "$ACTUAL"
+
+CMD="$BOX -e altenv ip ambiata:totp:asg.totp.helium.blargho"
+EXPECT="172.131.22.14"
+echo $CMD
+ACTUAL=$($CMD)
+check "$EXPECT" "$ACTUAL"
+
+# Test ssh and ssh -s finds correct params from correct env
+CMD="$BOX -e altenv --dry-run ssh ambiata:totp:asg.totp.helium.blargho"
+EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o HostKeyAlias=box.ambiata.gateway.mapple.gary.7.i-fe6988ed.jump '$BOX_USER'@54.22.33.6 nc %h %p 2>/dev/null","-o","HostKeyAlias=box.asg.totp.helium.blargho.i-c841127j.jump","'$BOX_USER'@172.131.22.14"]'
+echo $CMD
+ACTUAL=$($CMD)
+check "$EXPECT" "$ACTUAL"
+
+CMD="$BOX -e altenv --dry-run ssh -s ambiata:totp:asg.totp.helium.blargho"
+EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o HostKeyAlias=box.asg.gatewaysecure.helium.bingo.i-9691127j.jump '$BOX_USER'@152.65.153.178 nc %h %p 2>/dev/null","-o","HostKeyAlias=box.asg.totp.helium.blargho.i-c841127j.jump","'$BOX_USER'@172.131.22.14"]'
+echo $CMD
+ACTUAL=$($CMD)
+check "$EXPECT" "$ACTUAL"
+
+# Test explicit v1 (set via env) still works
+echo "Testing v1..."
+export BOX_STORE=test/cli/basic/v1
+
+CMD="$BOX ip ambiata:farm"
+EXPECT="10.1.10.24"
+echo $CMD
+ACTUAL=$($CMD)
+check "$EXPECT" "$ACTUAL"
