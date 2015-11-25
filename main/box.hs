@@ -33,6 +33,7 @@ import           System.Posix.User
 import           Text.PrettyPrint.Boxes ((<+>))
 import qualified Text.PrettyPrint.Boxes as PB
 
+import           X.Control.Monad.Trans.Either
 import           X.Options.Applicative
 
 ------------------------------------------------------------------------
@@ -58,6 +59,7 @@ data BoxCommandError =
   | BoxAwsError Error
   | BoxNoFilter
   | BoxNoMatches
+  | BoxNoGateway
   | BoxMissingRSHHost
   | BoxInvalidRSHHost Text
 
@@ -111,7 +113,9 @@ boxSSH runType gwType qTarget args boxes = do
   let qGateway = Query ExactAll (Exact $ gatewayFlavour gwType) InfixAll ExactAll
 
   target  <- randomBoxOfQuery qTarget  boxes
-  gateway <- randomBoxOfQuery qGateway boxes
+  gateway <- firstEitherT (\case
+                             BoxNoMatches -> BoxNoGateway
+                             e            -> e) $ randomBoxOfQuery qGateway boxes
 
   let boxNiceName b = unName (boxName b) <> "." <> unInstanceId (boxInstance b)
       boxAlias    b = "box." <> boxNiceName b <> ".jump"
@@ -235,6 +239,7 @@ boxCommandErrorRender (BoxError e)          = boxErrorRender e
 boxCommandErrorRender (BoxAwsError e)       = errorRender e
 boxCommandErrorRender (BoxNoFilter)         = "No filter specified"
 boxCommandErrorRender (BoxNoMatches)        = "No matching boxes found"
+boxCommandErrorRender (BoxNoGateway)        = "No usable gateways found"
 boxCommandErrorRender (BoxMissingRSHHost)   = "Expected rsync to pass an argument for the hostname"
 boxCommandErrorRender (BoxInvalidRSHHost _) = "Expected an empty host to be specified, i.e. box rsync <query> -- -aH local-file :remote-file."
 
