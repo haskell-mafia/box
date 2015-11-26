@@ -226,10 +226,7 @@ boxFromText =
   first T.pack . parseOnly boxParser
 
 boxesToText :: [Box] -> Text
-boxesToText [] =
-  ""
-boxesToText bs =
-  (<> "\n") . T.intercalate "\n" . fmap boxToText $ bs
+boxesToText = T.unlines . fmap boxToText
 
 boxToText :: Box -> Text
 boxToText (Box (Client c) (Flavour f) (Name n) (InstanceId i) (Host h) (Host p)) =

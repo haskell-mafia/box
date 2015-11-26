@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Box.Cache (
@@ -6,36 +6,30 @@ module Box.Cache (
     , writeCache
     ) where
 
-import           Box.Data
-
 import           Control.Exception (IOException, handle)
-
-import qualified Data.Text.IO as T
-import           Data.Time (NominalDiffTime, getCurrentTime, diffUTCTime)
+import           Data.Text         as T (Text)
+import qualified Data.Text.IO      as T
+import           Data.Time         (NominalDiffTime, diffUTCTime, getCurrentTime)
 
 import           P
 
-import           System.Directory (getModificationTime, createDirectoryIfMissing)
-import           System.FilePath (takeDirectory)
-import           System.IO (IO, FilePath)
+import           System.Directory  (createDirectoryIfMissing, getModificationTime)
+import           System.FilePath   (takeDirectory)
+import           System.IO         (FilePath, IO)
 
 ------------------------------------------------------------------------
 
-readCache :: FilePath -> NominalDiffTime -> IO (Maybe [Box])
+readCache :: FilePath -> NominalDiffTime -> IO (Maybe Text)
 readCache path timeout = handle onError $ do
     stale <- isStale path timeout
-    case stale of
-      True  -> return Nothing
-      False -> do
-       cache <- T.readFile path
-       return (either (const Nothing) Just (boxesFromText cache))
+    if stale then return Nothing else Just <$> T.readFile path
   where
     onError (_ :: IOException) = return Nothing
 
-writeCache :: FilePath -> [Box] -> IO ()
-writeCache path boxes = handle onError $ do
+writeCache :: FilePath -> Text -> IO ()
+writeCache path content = handle onError $ do
     createDirectoryIfMissing True (takeDirectory path)
-    T.writeFile path (boxesToText boxes)
+    T.writeFile path content
   where
     onError (_ :: IOException) = return ()
 

@@ -204,26 +204,25 @@ boxList q boxes = liftIO $ do
 
 cachedBoxes :: EitherT BoxCommandError IO [Box]
 cachedBoxes = do
-  let timeout = 60 -- seconds
-
   env   <- liftIO getEnvFromArgs
-  path  <- liftIO (cacheEnv env)
-  cache <- liftIO (readCache path timeout)
-  case cache of
-    Just boxes -> return boxes
-    Nothing    -> fetchBoxes env
+  ifM (liftIO useCache) (fetchCache env) (fetchBoxes env) -- Skip cache when BOX_STORE set
   where
+    timeout = 60 -- seconds
+    fetchCache env = do
+      path  <- liftIO (cacheEnv env)
+      cache <- liftIO (readCache path timeout)
+      fromMaybeM (fetchBoxes env) (cache >>= rightToMaybe . boxesFromText)
     getEnvFromArgs = do
       args <- getArgs
       return $ getEnvArgs (filter (/= "--bash-completion-word") args)
     getEnvArgs = \case
       -- Grab the -e / --environment arg from inside a Completer
       -- Awful hack, but Applicative gives us no choice
-      ("-e":env:_) -> SomeEnv (T.pack env)
+      ("-e":env:_)            -> SomeEnv (T.pack env)
       ("--environment":env:_) -> SomeEnv (T.pack env)
-      ("--":_) -> DefaultEnv
-      (_:xs) -> getEnvArgs xs
-      [] -> DefaultEnv
+      ("--":_)                -> DefaultEnv
+      (_:xs)                  -> getEnvArgs xs
+      []                      -> DefaultEnv
 
 
 fetchBoxes :: Environment -> EitherT BoxCommandError IO [Box]
@@ -235,10 +234,13 @@ fetchBoxes en = do
     store   <- liftIO storeEnv
     boxes   <- squash (runAWST env (readBoxes store en))
     path    <- liftIO (cacheEnv en)
-    liftIO (writeCache path boxes)
+    liftIO $ whenM useCache (writeCache path (boxesToText boxes))
     return boxes
     where squash x = bimapEitherT BoxError    id . hoistEither
                  =<< bimapEitherT BoxAwsError id x
+
+useCache :: IO Bool
+useCache = (==) defaultBoxStore <$> storeEnv
 
 randomBoxOfQuery :: MonadIO m => Query -> [Box] -> EitherT BoxCommandError m Box
 randomBoxOfQuery q bs = do
@@ -298,6 +300,11 @@ ansiEscapesEnv = do
   return (if tty && ok then EnableANSIEscapes
                        else DisableANSIEscapes)
 
+envCacheEnvFactoryBean :: IO FilePath
+envCacheEnvFactoryBean = do
+  -- Grab environment cache filename from BOX_CACHE in env
+  baseCache <- cacheEnv DefaultEnv
+  pure (dropFileName baseCache </> "environments")
 
 ------------------------------------------------------------------------
 -- Argument Parsing
@@ -374,11 +381,26 @@ filterCompleter = mkCompleter $ \arg -> do
 
 envCompleter :: Completer
 envCompleter = mkCompleter $ \arg -> do
-  mregion <- getRegionFromEnv
-  awsEnv  <- newEnv (fromMaybe Sydney mregion) Discover
-  store   <- storeEnv
-  envs    <- runAWS awsEnv (listEnvironments store)
+  envs <- cachedEnvs
   return . fmap T.unpack $ filter ((T.pack arg) `T.isPrefixOf`) envs
+  where
+    cachedEnvs :: IO [Text]
+    cachedEnvs = do
+      cacheFile <- envCacheEnvFactoryBean
+      -- Only visit cache when permitted
+      useCache' <- useCache
+      cache     <- valueOrZeroM useCache' (readCache cacheFile 86400) -- 24h expiration
+      case cache of
+        Just envs -> return (T.lines envs)
+        Nothing   -> do
+          -- Head off to S3 or filesystem, write out the cache
+          mregion <- getRegionFromEnv
+          awsEnv  <- newEnv (fromMaybe Sydney mregion) Discover
+          store   <- storeEnv
+          envs    <- runAWS awsEnv (listEnvironments store)
+          -- Only write out cache when permitted
+          when useCache' (writeCache cacheFile (T.unlines envs))
+          return envs
 
 ------------------------------------------------------------------------
 -- Command Arguments

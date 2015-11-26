@@ -24,9 +24,9 @@ prop_roundtrip bs = testIO . withSystemTempDirectory "box" $ \dir ->
 
 roundtripCache :: FilePath -> [Box] -> IO Property
 roundtripCache path bs = do
-  writeCache path bs
+  writeCache path (boxesToText bs)
   bs' <- readCache path 60
-  return (bs' === Just bs)
+  return ((bs' >>= rightToMaybe . boxesFromText) === Just bs)
 
 ------------------------------------------------------------------------
 
