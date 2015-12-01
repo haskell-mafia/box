@@ -128,13 +128,3 @@ EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o HostKeyAlias=box.asg
 echo $CMD
 ACTUAL=$($CMD)
 check "$EXPECT" "$ACTUAL"
-
-# Test explicit v1 (set via env) still works
-echo "Testing v1..."
-export BOX_STORE=test/cli/basic/v1
-
-CMD="$BOX ip ambiata:farm"
-EXPECT="10.1.10.24"
-echo $CMD
-ACTUAL=$($CMD)
-check "$EXPECT" "$ACTUAL"
