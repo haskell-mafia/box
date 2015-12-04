@@ -64,6 +64,10 @@ EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o HostKeyAlias=box.amb
 ACTUAL=$($BOX --dry-run ssh -s acme:lab)
 check "$EXPECT" "$ACTUAL"
 
+EXPECT='["ssh","-o","HostKeyAlias=box.ambiata.gateway.apple.gray.7.i-fe6988ed.jump","'$BOX_USER'@54.1.1.6"]'
+ACTUAL=$($BOX --dry-run ssh :gateway:)
+check "$EXPECT" "$ACTUAL"
+
 EXPECT=$(cat <<'EOF'
 ip:Get the IP address of a box.
 ssh:SSH to a box.
