@@ -111,55 +111,58 @@ boxIP _ q hostType boxes = do
 
 boxSSH :: RunType -> GatewayType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
 boxSSH runType gwType qTarget args boxes = do
-  let qGateway = Query ExactAll (Exact $ gatewayFlavour gwType) InfixAll ExactAll
-
   target  <- randomBoxOfQuery qTarget  boxes
-  gateway <- firstEitherT (\case
-                             BoxNoMatches -> BoxNoGateway
-                             e            -> e) $ randomBoxOfQuery qGateway boxes
+  user    <- liftIO userEnv
+  ident   <- liftIO identityEnv
+  if match qGateway target
+    then goDirect target user ident -- Use proxy
+    else goJump   target user ident -- ... unless target is a gateway
+  where
+    qGateway = Query ExactAll (Exact $ gatewayFlavour gwType) InfixAll ExactAll
+    randomGw = firstEitherT (\case
+                   BoxNoMatches -> BoxNoGateway
+                   e            -> e) $ randomBoxOfQuery qGateway boxes
+    boxNiceName b  = unName (boxName b) <> "." <> unInstanceId (boxInstance b)
+    boxAlias    b  = "box." <> boxNiceName b <> ".jump"
+    -- Keep track of host keys using the target's somewhat unique name
+    hostKeyAlias t = ["-o", "HostKeyAlias=" <> boxAlias t]
+    userHost u th  = [u <> "@" <> th]
+    ---
+    goJump target user ident = do
+      gateway <- randomGw
+      let targetHost = unHost (selectHost InternalHost target)
+          gatewayHost = unHost (selectHost ExternalHost gateway)
+      go runType (boxNiceName target) $
+        [ -- ProxyCommand bounces us off the gateway. Note that we pipe
+          -- netcat's stderr to /dev/null to avoid the annoying 'Killed
+          -- by signal 1.' message when the session finishes.
+          "-o", "ProxyCommand=ssh" <> " -i " <> ident
+                                   <> " -o HostKeyAlias=" <> boxAlias gateway
+                                   <> " " <> user <> "@" <> gatewayHost
+                                   <> " nc %h %p 2>/dev/null"
+        ] <> hostKeyAlias target      -- SSH host alias
+          <> userHost user targetHost -- Connect to target
+          <> args                     -- Pass on remaining args to SSH
+    ---
+    goDirect target user _ident = do
+      let targetHost = unHost (selectHost ExternalHost target)
+      go runType (boxNiceName target) $ hostKeyAlias target <> userHost user targetHost <> args
+    ---
+    go runtype boxname args' = case runtype of
+      DryRun  ->
+        liftIO (print ("ssh" : args'))
 
-  let boxNiceName b = unName (boxName b) <> "." <> unInstanceId (boxInstance b)
-      boxAlias    b = "box." <> boxNiceName b <> ".jump"
+      RealRun -> do
+        -- Set the title of the terminal.
+        ansi <- liftIO ansiEscapesEnv
+        case ansi of
+          DisableANSIEscapes -> return ()
+          EnableANSIEscapes  -> liftIO $ do
+            T.putStr ("\ESC]0;" <> boxname <> "\BEL")
+            hFlush stdout
 
-  let targetHost  = unHost (selectHost InternalHost target)
-      gatewayHost = unHost (selectHost ExternalHost gateway)
-
-  user     <- liftIO userEnv
-  identity <- liftIO identityEnv
-
-  let args' = [ -- ProxyCommand bounces us off the gateway. Note that we pipe
-                -- netcat's stderr to /dev/null to avoid the annoying 'Killed
-                -- by signal 1.' message when the session finishes.
-                "-o", "ProxyCommand=ssh" <> " -i " <> identity
-                                         <> " -o HostKeyAlias=" <> boxAlias gateway
-                                         <> " " <> user <> "@" <> gatewayHost
-                                         <> " nc %h %p 2>/dev/null"
-
-                -- Keep track of host keys using the target's somewhat unique
-                -- name.
-              , "-o", "HostKeyAlias=" <> boxAlias target
-
-                -- Connect to target box.
-              , user <> "@" <> targetHost
-
-                -- Pass on any additional arguments to 'ssh'.
-              ] <> args
-
-  case runType of
-    DryRun  ->
-      liftIO (print ("ssh" : args'))
-
-    RealRun -> do
-      -- Set the title of the terminal.
-      ansi <- liftIO ansiEscapesEnv
-      case ansi of
-        DisableANSIEscapes -> return ()
-        EnableANSIEscapes  -> liftIO $ do
-          T.putStr ("\ESC]0;" <> boxNiceName target <> "\BEL")
-          hFlush stdout
-
-      -- This call never returns, the current process is replaced by 'ssh'.
-      liftIO (exec "ssh" args')
+        -- This call never returns, the current process is replaced by 'ssh'.
+        liftIO (exec "ssh" args')
 
 boxRSH :: RunType -> GatewayType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
 boxRSH runType gwType qTarget args boxes = do
