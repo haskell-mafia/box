@@ -336,7 +336,7 @@ boxCommands =
   , Command "rsh" "SSH to a box with a shell interface compatible with rsync."
             (BoxRSH   <$> gatewayP <*> queryP <*> many sshArgP )
 
-  , Command "rsync" "SSH to a box."
+  , Command "rsync" "Invoke rsync via box."
             (BoxRSync <$> gatewayP <*> queryP <*> many sshArgP)
 
   , Command "ls"  "List available boxes."
