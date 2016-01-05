@@ -362,7 +362,7 @@ queryP =
   argument (pOption queryParser) $
        metavar "FILTER"
     <> completer filterCompleter
-    <> help "Filter using the following syntax: CLIENT[:FLAVOUR[:NAME]]"
+    <> help "Filter using the following syntax: CLIENT[:FLAVOUR[:NAME[:INSTANCE-ID]]]"
 
 matchAll :: Query
 matchAll = Query ExactAll ExactAll InfixAll ExactAll
