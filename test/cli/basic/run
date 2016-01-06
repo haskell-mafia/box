@@ -72,7 +72,7 @@ EXPECT=$(cat <<'EOF'
 ip:Get the IP address of a box.
 ssh:SSH to a box.
 rsh:SSH to a box with a shell interface compatible with rsync.
-rsync:SSH to a box.
+rsync:Invoke rsync via box.
 ls:List available boxes.
 EOF
 )
