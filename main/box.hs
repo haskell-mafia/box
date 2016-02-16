@@ -41,7 +41,7 @@ import           X.Options.Applicative
 
 data BoxCommand =
     BoxIP    Query HostType
-  | BoxSSH   GatewayType Query [SSHArg]
+  | BoxSSH   GatewayType Query SSHCommandType [SSHArg]
   | BoxRSH   GatewayType Query [SSHArg]
   | BoxRSync GatewayType Query [SSHArg]
   | BoxList  Query
@@ -51,6 +51,15 @@ data HostType =
     ExternalHost
   | InternalHost
   deriving (Eq, Show)
+
+data SSHCommandType =
+    RegularSSH
+  | AutoSSH
+  deriving (Eq, Show)
+
+sshCommand :: SSHCommandType -> Text
+sshCommand RegularSSH = "ssh"
+sshCommand AutoSSH = "autossh"
 
 type SSHArg = Text
 
@@ -89,7 +98,7 @@ main = do
     Safe (RunCommand r cmd) -> do
       case cmd of
         BoxIP     q host   -> runCommand env (boxIP  r q host)
-        BoxSSH    g q args -> runCommand env (boxSSH r g q args)
+        BoxSSH    g q sc args -> runCommand env (boxSSH r g q sc args)
         BoxRSH    g q args -> runCommand env (boxRSH r g q args)
         BoxRSync  g q args -> runCommand env (const $ boxRSync r g q args)
         BoxList   q        -> runCommand env (boxList q)
@@ -109,8 +118,8 @@ boxIP _ q hostType boxes = do
   b <- randomBoxOfQuery q boxes
   liftIO (putStrLn . T.unpack . unHost . selectHost hostType $ b)
 
-boxSSH :: RunType -> GatewayType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
-boxSSH runType gwType qTarget args boxes = do
+boxSSH :: RunType -> GatewayType -> Query -> SSHCommandType -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
+boxSSH runType gwType qTarget sshc args boxes = do
   target  <- randomBoxOfQuery qTarget  boxes
   user    <- liftIO userEnv
   ident   <- liftIO identityEnv
@@ -150,7 +159,7 @@ boxSSH runType gwType qTarget args boxes = do
     ---
     go runtype boxname args' = case runtype of
       DryRun  ->
-        liftIO (print ("ssh" : args'))
+        liftIO (print (sshc' : args'))
 
       RealRun -> do
         -- Set the title of the terminal.
@@ -162,7 +171,9 @@ boxSSH runType gwType qTarget args boxes = do
             hFlush stdout
 
         -- This call never returns, the current process is replaced by 'ssh'.
-        liftIO (exec "ssh" args')
+        liftIO (exec sshc' args')
+
+    sshc' = sshCommand sshc
 
 boxRSH :: RunType -> GatewayType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
 boxRSH runType gwType qTarget args boxes = do
@@ -170,7 +181,7 @@ boxRSH runType gwType qTarget args boxes = do
     [] ->
       left BoxMissingRSHHost
     ("":xs) ->
-      boxSSH runType gwType qTarget xs boxes
+      boxSSH runType gwType qTarget RegularSSH xs boxes
     (h:_) ->
       left $ BoxInvalidRSHHost h
 
@@ -331,7 +342,7 @@ boxCommands =
             (BoxIP    <$> queryP <*> hostTypeP)
 
   , Command "ssh" "SSH to a box."
-            (BoxSSH   <$> gatewayP <*> queryP <*> many sshArgP)
+            (BoxSSH   <$> gatewayP <*> queryP <*> sshCommandP <*> many sshArgP)
 
   , Command "rsh" "SSH to a box with a shell interface compatible with rsync."
             (BoxRSH   <$> gatewayP <*> queryP <*> many sshArgP )
@@ -364,6 +375,13 @@ queryP =
     <> completer filterCompleter
     <> help "Filter using the following syntax: CLIENT[:FLAVOUR[:NAME[:INSTANCE-ID]]]"
 
+sshCommandP :: Parser SSHCommandType
+sshCommandP =
+  flag RegularSSH AutoSSH $
+       long "autossh"
+    <> short 'a'
+    <> help "Use the autossh to restart sessions (useful for proxying)."
+  
 matchAll :: Query
 matchAll = Query ExactAll ExactAll InfixAll ExactAll
 
