@@ -10,3 +10,6 @@
 [submodule "lib/mismi"]
 	path = lib/mismi
 	url = git@github.com:ambiata/mismi.git
+[submodule "lib/twine"]
+	path = lib/twine
+	url = git@github.com:ambiata/twine

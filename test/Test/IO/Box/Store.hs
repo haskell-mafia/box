@@ -10,13 +10,16 @@ import           Box.Store
 import           P
 
 import           Test.Box.Arbitrary ()
-import           Test.Mismi.Amazonka
+import           Test.Mismi.S3
 import           Test.QuickCheck
 
 
-prop_readwrite_s3 bs = withAWS (writeReadBoxes bs . BoxStoreS3)
+prop_readwrite_s3 bs = testAWS $ do
+  path <- newAddress
+  writeReadBoxes bs . BoxStoreS3 $ path
 
-prop_readwrite_local bs = withLocalAWS $ \path _ -> do
+prop_readwrite_local bs = testAWS $ do
+  path <- newFilePath
   writeReadBoxes bs . BoxStoreLocal . (<> "/file") $ path
 
 

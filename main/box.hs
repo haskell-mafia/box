@@ -11,10 +11,8 @@ import           BuildInfo_ambiata_box
 import           Box
 
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Either
 
 import           Data.List (sort)
-import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
@@ -34,6 +32,7 @@ import           Text.PrettyPrint.Boxes ((<+>))
 import qualified Text.PrettyPrint.Boxes as PB
 
 import           X.Control.Monad.Trans.Either
+import           X.Control.Monad.Trans.Either.Exit (orDie)
 import           X.Options.Applicative
 
 ------------------------------------------------------------------------
@@ -232,10 +231,10 @@ fetchBoxes :: Environment -> EitherT BoxCommandError IO [Box]
 fetchBoxes en = do
     -- We don't want people setting a default AWS region
     -- on their local machine, use Sydney instead.
-    mregion <- getRegionFromEnv
-    env     <- newEnv (fromMaybe Sydney mregion) Discover
+    mregion <- fmap (either (const Sydney) id) $ runEitherT getRegionFromEnv
+    env     <- newEnv mregion Discover
     store   <- liftIO storeEnv
-    boxes   <- squash (runAWST env (readBoxes store en))
+    boxes   <- squash (runAWS env (readBoxes store en))
     path    <- liftIO (cacheEnv en)
     liftIO $ whenM useCache (writeCache path (boxesToText boxes))
     return boxes
@@ -256,7 +255,7 @@ selectHost ExternalHost = boxPublicHost
 
 boxCommandErrorRender :: BoxCommandError -> Text
 boxCommandErrorRender (BoxError e)          = boxErrorRender e
-boxCommandErrorRender (BoxAwsError e)       = errorRender e
+boxCommandErrorRender (BoxAwsError e)       = renderError e
 boxCommandErrorRender (BoxNoFilter)         = "No filter specified"
 boxCommandErrorRender (BoxNoMatches)        = "No matching boxes found"
 boxCommandErrorRender (BoxNoGateway)        = "No usable gateways found"
@@ -397,10 +396,11 @@ envCompleter = mkCompleter $ \arg -> do
         Just envs -> return (T.lines envs)
         Nothing   -> do
           -- Head off to S3 or filesystem, write out the cache
-          mregion <- getRegionFromEnv
-          awsEnv  <- newEnv (fromMaybe Sydney mregion) Discover
-          store   <- storeEnv
-          envs    <- runAWS awsEnv (listEnvironments store)
+          envs <- fmap (either (const []) id) $ do
+            mregion <- runEitherT getRegionFromEnv
+            awsEnv  <- newEnv (either (const Sydney) id mregion) Discover
+            store   <- storeEnv
+            runEitherT $ runAWS awsEnv (listEnvironments store)
           -- Only write out cache when permitted
           when useCache' (writeCache cacheFile (T.unlines envs))
           return envs
