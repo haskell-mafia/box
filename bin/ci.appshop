@@ -2,7 +2,7 @@
 
 $(dirname $0)/ci.branches
 
-VERSION=$(cat $(dirname $0)/../dist/build/autogen/version.txt)
+VERSION=$(cat $(dirname $0)/../gen/version.txt)
 
 aws s3 --region=ap-southeast-2 cp dist/build/box/box  s3://ambiata-app/box/$VERSION/box-$VERSION
 aws s3 --region=ap-southeast-2 cp box-completion.bash s3://ambiata-app/box/$VERSION/box-$VERSION-completion.bash

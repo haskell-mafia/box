@@ -16,8 +16,9 @@ import           Control.Monad.Trans.Either
 import           Data.Text as T
 import           Data.Text.IO as T
 
-import           Mismi as Mismi hiding (InstanceId, matchAll, timeout, parser)
-import           Mismi.S3 as Mismi hiding (InstanceId, key, matchAll, timeout, parser, (</>))
+import           Mismi as Mismi
+import           Mismi.S3 as Mismi hiding (runAWS, key)
+import           Mismi.Amazonka as Mismi hiding (runAWS, InstanceId, matchAll, parser, timeout)
 
 import           P
 
