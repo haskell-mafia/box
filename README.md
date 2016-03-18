@@ -52,6 +52,7 @@ box rsync vapour:dev:kermit -- -aH :/mnt/me/plots plots
 |`BOX_USER`         | *current unix user*  | The username used to log in to the ssh server |
 |`BOX_IDENTITY`     | `~/.ssh/ambiata_rsa` | Path to the identity file used to log in to the ssh server |
 |`BOX_ANSI_ESCAPES` | `1`                  | When attached to a terminal, allow the use of ANSI escape codes to change the title of the terminal, or color box's output. Set this to `0` to disable.|
+|`BOX_STORE`        | `s3://ambiata-dispensary/box/v2`   | Override for when the `-e` flag doesn't work. Use `s3://ambiata-dispensary/box/*env*.v2` |
 
 ### Filters
 
