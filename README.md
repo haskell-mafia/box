@@ -52,6 +52,7 @@ box rsync vapour:dev:kermit -- -aH :/mnt/me/plots plots
 |`BOX_USER`         | *current unix user*  | The username used to log in to the ssh server |
 |`BOX_IDENTITY`     | `~/.ssh/ambiata_rsa` | Path to the identity file used to log in to the ssh server |
 |`BOX_ANSI_ESCAPES` | `1`                  | When attached to a terminal, allow the use of ANSI escape codes to change the title of the terminal, or color box's output. Set this to `0` to disable.|
+|`BOX_STORE`        | `s3://ambiata-dispensary/box/v2`   | Override for when the `-e` flag doesn't work. Use `s3://ambiata-dispensary/box/*env*.v2` |
 
 ### Filters
 
@@ -84,12 +85,23 @@ effect, so not everyone is hammering the same server.
 
 ### Advanced Usage
 
+#### Tunnelling
 Example of creating an `ssh` tunnel using `box` using port `8787` on
 both local and remote ends of the tunnel.
 
 ```
 box ssh vapour:dev:fozzie -- -L 8787:localhost:8787
 ```
+
+#### Secure SSH via TOTP
+
+```
+box ssh [-s|--secure] [filter]
+```
+
+Note: The flag needs to come after the `ssh` parameter. Order matters. 
+
+[More information on SSH 2-Factor-Authentication](https://github.com/ambiata/architecture/blob/master/operations/ssh-2fa.md)
 
 ### Completion Support
 
