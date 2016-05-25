@@ -29,7 +29,7 @@ if $BOX ip mincom:land:brown; then exit 1; fi
 if $BOX ip mincom:land:kermit; then exit 1; fi
 if $BOX ip mincom:hub; then exit 1; fi
 
-function check() {
+check() {
   if [ "$1" != "$2" ]; then
     BOX_TEMP=$(mktemp -d 2>/dev/null || mktemp -d -t 'box')
     trap "rm -rf $BOX_TEMP" EXIT
