@@ -17,6 +17,7 @@ module Box.Data (
   , GatewayType (..)
   , BoxError (..)
   , Environment (..)
+  , HostKey (..)
   , queryHasMatch
   , queryFromText
   , queryParser
@@ -54,6 +55,7 @@ data Box =
     , boxInstance   :: InstanceId
     , boxHost       :: Host
     , boxPublicHost :: Host
+    , boxHostKey    :: HostKey
     } deriving (Eq, Ord, Show)
 
 data BoxStore =
@@ -119,6 +121,11 @@ data Environment =
     SomeEnv Text
   | DefaultEnv
   deriving (Eq, Show)
+
+newtype HostKey =
+  HostKey {
+    unHostKey :: Text
+  } deriving (Eq, Ord, Show)
 
 ------------------------------------------------------------------------
 -- Query
@@ -229,21 +236,23 @@ boxesToText :: [Box] -> Text
 boxesToText = T.unlines . fmap boxToText
 
 boxToText :: Box -> Text
-boxToText (Box (Client c) (Flavour f) (Name n) (InstanceId i) (Host h) (Host p)) =
-  T.intercalate " " [i, h, p, n, c, f]
+boxToText (Box (Client c) (Flavour f) (Name n) (InstanceId i) (Host h) (Host p) (HostKey hk)) =
+  T.intercalate " " [i, h, p, n, c, f, hk]
 
 boxParser :: Parser Box
 boxParser = do
-  let t = AP.takeWhile (/= ' ')
-      ts = t <* string " "
+  let t = AP.takeWhile (/= '\t')
+      ts = t <* char '\t'
   i <- InstanceId <$> ts
   h <- Host <$> ts
   p <- Host <$> ts
   n <- Name <$> ts
   c <- Client <$> ts
-  f <- Flavour <$> t
+  f <- Flavour <$> ts
+  _ <- AP.count 6 ts  -- skip 6 fields
+  hk <- HostKey <$> t
   endOfInput
-  pure $ Box c f n i h p
+  pure $ Box c f n i h p hk
 
 boxStoreRender :: BoxStore -> Text
 boxStoreRender (BoxStoreLocal f) =

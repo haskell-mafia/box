@@ -13,6 +13,7 @@ import           P
 
 import           Test.QuickCheck
 
+import           Data.Bits (shiftL)
 
 data BoxResult =
   BoxResult Box Query
@@ -20,7 +21,7 @@ data BoxResult =
 
 instance Arbitrary BoxResult where
   arbitrary = do
-    b@(Box c f (Name n) i _ _) <- arbitrary
+    b@(Box c f (Name n) i _ _ _) <- arbitrary
 
     ndrop <- choose (0, T.length n)
     ntake <- choose (0, T.length n - ndrop)
@@ -36,6 +37,7 @@ instance Arbitrary BoxResult where
 instance Arbitrary Box where
   arbitrary = Box
     <$> arbitrary
+    <*> arbitrary
     <*> arbitrary
     <*> arbitrary
     <*> arbitrary
@@ -83,3 +85,10 @@ instance Arbitrary Client where
 
 instance Arbitrary Flavour where
   arbitrary = Flavour <$> elements cooking
+
+instance Arbitrary HostKey where
+  -- real data has a trailing space character
+  arbitrary = do
+     hk <- show <$> choose (2 `shiftL` 200, 3 `shiftL` 300 :: Integer)
+     pure $ HostKey ((pack hk) <> " ")
+

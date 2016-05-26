@@ -23,7 +23,7 @@ query q =
   L.filter (match q)
 
 match :: Query -> Box -> Bool
-match (Query qc qf qn qi) (Box bc bf bn bi _ _) =
+match (Query qc qf qn qi) (Box bc bf bn bi _ _ _) =
      matchExact unClient     bc qc
   && matchExact unFlavour    bf qf
   && matchInfix unName       bn qn
