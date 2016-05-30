@@ -298,7 +298,7 @@ cacheEnv env = do
 ansiEscapesEnv :: IO ANSIEscapes
 ansiEscapesEnv = do
   tty <- liftIO (hIsTerminalDevice stdout)
-  ok  <- (/= "0") . fromMaybe "1" <$> lookupEnv "BOX_ANSI_ESCAPES"
+  ok  <- (/= "0") . fromMaybe "0" <$> lookupEnv "BOX_ANSI_ESCAPES"
   return (if tty && ok then EnableANSIEscapes
                        else DisableANSIEscapes)
 
