@@ -18,6 +18,14 @@ module Box.Data (
   , BoxError (..)
   , Environment (..)
   , HostKey (..)
+  , Context (..)
+  , BoxStatus (..)
+  , TZ (..)
+  , ImageId (..)
+  , AvailibilityZone (..)
+  , Lifecycle (..)
+  , Project (..)
+  , Note (..)
   , queryHasMatch
   , queryFromText
   , queryParser
@@ -55,7 +63,15 @@ data Box =
     , boxInstance   :: InstanceId
     , boxHost       :: Host
     , boxPublicHost :: Host
+    , boxContext    :: Context
+    , boxStatus     :: BoxStatus
+    , boxTimezone   :: TZ
+    , boxImageId    :: ImageId
+    , boxAvailZone  :: AvailibilityZone
+    , boxLifecycle  :: Lifecycle
     , boxHostKey    :: HostKey
+    , boxProject    :: Project
+    , boxNote       :: Note
     } deriving (Eq, Ord, Show)
 
 data BoxStore =
@@ -103,6 +119,46 @@ newtype Client =
 newtype Flavour =
   Flavour {
     unFlavour :: Text
+  } deriving (Eq, Ord, Show)
+
+newtype Context =
+  Context {
+    unContext :: Text
+  } deriving (Eq, Ord, Show)
+
+newtype BoxStatus =
+  BoxStatus {
+    unBoxStatus :: Text
+  } deriving (Eq, Ord, Show)
+
+newtype TZ =
+  TZ {
+    unTZ :: Text
+  } deriving (Eq, Ord, Show)
+
+newtype ImageId =
+  ImageId {
+    unImageId :: Text
+  } deriving (Eq, Ord, Show)
+
+newtype AvailibilityZone =
+  AvailibilityZone {
+    unAvailibilityZone :: Text
+  } deriving (Eq, Ord, Show)
+
+newtype Lifecycle =
+  Lifecycle {
+    unLifecycle :: Text
+  } deriving (Eq, Ord, Show)
+
+newtype Project =
+  Project {
+    unProject :: Text
+  } deriving (Eq, Ord, Show)
+
+newtype Note =
+  Note {
+    unNote :: Text
   } deriving (Eq, Ord, Show)
 
 data BoxError =
@@ -236,9 +292,12 @@ boxesToText :: [Box] -> Text
 boxesToText = T.unlines . fmap boxToText
 
 boxToText :: Box -> Text
-boxToText (Box (Client c) (Flavour f) (Name n) (InstanceId i) (Host h) (Host p) (HostKey hk)) =
-  T.intercalate " " [i, h, p, n, c, f, hk]
+boxToText (Box (Client c) (Flavour f) (Name n) (InstanceId i) (Host h) (Host p) (Context ctx) (BoxStatus st)
+            (TZ tz) (ImageId img) (AvailibilityZone az) (Lifecycle lc) (HostKey hk) (Project pr) (Note nt)) =
+  T.intercalate "\t" [i, h, p, n, c, f, st, tz, ctx, img, az, lc, hk, pr, nt]
 
+
+-- Format specified in 'power' project, file 'src/Power/Box/V3.hs'
 boxParser :: Parser Box
 boxParser = do
   let t = AP.takeWhile (/= '\t')
@@ -249,10 +308,17 @@ boxParser = do
   n <- Name <$> ts
   c <- Client <$> ts
   f <- Flavour <$> ts
-  _ <- AP.count 6 ts  -- skip 6 fields
-  hk <- HostKey <$> t
+  is <- BoxStatus <$> ts
+  tz <- TZ <$> ts
+  ctx <- Context <$> ts
+  im <- ImageId <$> ts
+  az <- AvailibilityZone <$> ts
+  lc <- Lifecycle <$> ts
+  hk <- HostKey <$> ts
+  pr <- Project <$> ts
+  nt <- Note <$> AP.takeText
   endOfInput
-  pure $ Box c f n i h p hk
+  pure $ Box c f n i h p ctx is tz im az lc hk pr nt
 
 boxStoreRender :: BoxStore -> Text
 boxStoreRender (BoxStoreLocal f) =
