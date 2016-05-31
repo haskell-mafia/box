@@ -17,6 +17,15 @@ module Box.Data (
   , GatewayType (..)
   , BoxError (..)
   , Environment (..)
+  , HostKey (..)
+  , Context (..)
+  , BoxStatus (..)
+  , TZ (..)
+  , ImageId (..)
+  , AvailibilityZone (..)
+  , Lifecycle (..)
+  , Project (..)
+  , Note (..)
   , queryHasMatch
   , queryFromText
   , queryParser
@@ -54,6 +63,15 @@ data Box =
     , boxInstance   :: InstanceId
     , boxHost       :: Host
     , boxPublicHost :: Host
+    , boxContext    :: Context
+    , boxStatus     :: BoxStatus
+    , boxTimezone   :: TZ
+    , boxImageId    :: ImageId
+    , boxAvailZone  :: AvailibilityZone
+    , boxLifecycle  :: Lifecycle
+    , boxHostKey    :: HostKey
+    , boxProject    :: Project
+    , boxNote       :: Note
     } deriving (Eq, Ord, Show)
 
 data BoxStore =
@@ -103,6 +121,46 @@ newtype Flavour =
     unFlavour :: Text
   } deriving (Eq, Ord, Show)
 
+newtype Context =
+  Context {
+    unContext :: Text
+  } deriving (Eq, Ord, Show)
+
+newtype BoxStatus =
+  BoxStatus {
+    unBoxStatus :: Text
+  } deriving (Eq, Ord, Show)
+
+newtype TZ =
+  TZ {
+    unTZ :: Text
+  } deriving (Eq, Ord, Show)
+
+newtype ImageId =
+  ImageId {
+    unImageId :: Text
+  } deriving (Eq, Ord, Show)
+
+newtype AvailibilityZone =
+  AvailibilityZone {
+    unAvailibilityZone :: Text
+  } deriving (Eq, Ord, Show)
+
+newtype Lifecycle =
+  Lifecycle {
+    unLifecycle :: Text
+  } deriving (Eq, Ord, Show)
+
+newtype Project =
+  Project {
+    unProject :: Text
+  } deriving (Eq, Ord, Show)
+
+newtype Note =
+  Note {
+    unNote :: Text
+  } deriving (Eq, Ord, Show)
+
 data BoxError =
     BoxNotFound BoxStore
   | BoxParseError Text
@@ -119,6 +177,11 @@ data Environment =
     SomeEnv Text
   | DefaultEnv
   deriving (Eq, Show)
+
+newtype HostKey =
+  HostKey {
+    unHostKey :: Text
+  } deriving (Eq, Ord, Show)
 
 ------------------------------------------------------------------------
 -- Query
@@ -229,21 +292,33 @@ boxesToText :: [Box] -> Text
 boxesToText = T.unlines . fmap boxToText
 
 boxToText :: Box -> Text
-boxToText (Box (Client c) (Flavour f) (Name n) (InstanceId i) (Host h) (Host p)) =
-  T.intercalate " " [i, h, p, n, c, f]
+boxToText (Box (Client c) (Flavour f) (Name n) (InstanceId i) (Host h) (Host p) (Context ctx) (BoxStatus st)
+            (TZ tz) (ImageId img) (AvailibilityZone az) (Lifecycle lc) (HostKey hk) (Project pr) (Note nt)) =
+  T.intercalate "\t" [i, h, p, n, c, f, st, tz, ctx, img, az, lc, hk, pr, nt]
 
+
+-- Format specified in 'power' project, file 'src/Power/Box/V3.hs'
 boxParser :: Parser Box
 boxParser = do
-  let t = AP.takeWhile (/= ' ')
-      ts = t <* string " "
+  let t = AP.takeWhile (/= '\t')
+      ts = t <* char '\t'
   i <- InstanceId <$> ts
   h <- Host <$> ts
   p <- Host <$> ts
   n <- Name <$> ts
   c <- Client <$> ts
-  f <- Flavour <$> t
+  f <- Flavour <$> ts
+  is <- BoxStatus <$> ts
+  tz <- TZ <$> ts
+  ctx <- Context <$> ts
+  im <- ImageId <$> ts
+  az <- AvailibilityZone <$> ts
+  lc <- Lifecycle <$> ts
+  hk <- HostKey <$> ts
+  pr <- Project <$> ts
+  nt <- Note <$> AP.takeText
   endOfInput
-  pure $ Box c f n i h p
+  pure $ Box c f n i h p ctx is tz im az lc hk pr nt
 
 boxStoreRender :: BoxStore -> Text
 boxStoreRender (BoxStoreLocal f) =

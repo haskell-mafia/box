@@ -55,12 +55,12 @@ listEnvironments bs = envNames bs
 
 defaultBoxStore :: BoxStore
 defaultBoxStore =
-  BoxStoreS3 (Address (Bucket "ambiata-dispensary") (Key "box/v2"))
+  BoxStoreS3 (Address (Bucket "ambiata-dispensary") (Key "box/prod.v3"))
 
 -- Filepath munging for alt environments
 boxStoreWithEnv :: BoxStore -> Environment -> BoxStore
 boxStoreWithEnv bs DefaultEnv = bs
 boxStoreWithEnv (BoxStoreS3 (Address b (Key k))) (SomeEnv e) =
-  BoxStoreS3 (Address b (Key . T.pack $ dropFileName (T.unpack k) </> T.unpack e <.> ".v2"))
+  BoxStoreS3 (Address b (Key . T.pack $ dropFileName (T.unpack k) </> T.unpack e <.> ".v3"))
 boxStoreWithEnv (BoxStoreLocal lf) (SomeEnv e) =
-  BoxStoreLocal (dropFileName lf </> T.unpack e <.> ".v2")
+  BoxStoreLocal (dropFileName lf </> T.unpack e <.> ".v3")
