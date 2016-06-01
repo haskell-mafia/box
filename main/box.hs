@@ -145,11 +145,18 @@ boxSSH runType gwType qTarget args boxes = do
     ---
     goDirect target user _ident = do
       let targetHost = unHost (selectHost ExternalHost target)
-      go runType (boxNiceName target) $ hostKeyAlias target <> userHost user targetHost <> args
+      knownHosts <- liftIO $ knownHostsFileLoc
+      case runType of
+        DryRun -> return ()
+        RealRun -> liftIO $ updateKnowHosts knownHosts target
+      go runType (boxNiceName target) $
+        [ "-o", "UserKnownHostsFile=" <> knownHosts ]
+        <> userHost user targetHost <> args
     ---
     go runtype boxname args' = case runtype of
       DryRun  ->
-        liftIO (print ("ssh" : args'))
+        liftIO $ do
+            (print ("ssh" : args'))
 
       RealRun -> do
         -- Set the title of the terminal.
@@ -285,6 +292,19 @@ identityEnv :: IO Text
 identityEnv = do
   home <- getHomeDirectory
   T.pack . fromMaybe (home </> ".ssh/ambiata_rsa") <$> lookupEnv "BOX_IDENTITY"
+
+knownHostsFileLoc :: IO Text
+knownHostsFileLoc = do
+  home <- getHomeDirectory
+  T.pack . fromMaybe (home </> ".ssh/box_known_hosts") <$> lookupEnv "BOX_KNOWN_HOSTS"
+
+updateKnowHosts :: Text -> Box -> IO ()
+updateKnowHosts knownHostsFile target =
+  -- We use a `box` specific known hosts file and we overwrite it everytime we
+  -- invoke box. There's a potential for a race condition if someone runs more
+  -- than one instance of `box` at the same time, but thats unlikely.
+  T.writeFile (T.unpack knownHostsFile) $
+    unHost (selectHost ExternalHost target) <> " " <> unHostKey (boxHostKey target) <> " \n"
 
 cacheEnv :: Environment -> IO FilePath
 cacheEnv env = do
