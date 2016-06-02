@@ -10,6 +10,7 @@ import           BuildInfo_ambiata_box
 
 import           Box
 
+import           Control.Exception -- (Exception, catch)
 import           Control.Monad.IO.Class
 
 import           Data.List (sort)
@@ -25,6 +26,8 @@ import           System.Environment
 import           System.Exit
 import           System.FilePath ((</>), (<.>), dropFileName)
 import           System.IO
+import qualified System.Posix.Directory as PD
+import           System.Posix.Files
 import           System.Posix.Process
 import           System.Posix.User
 
@@ -145,11 +148,15 @@ boxSSH runType gwType qTarget args boxes = do
     ---
     goDirect target user _ident = do
       let targetHost = unHost (selectHost ExternalHost target)
-      go runType (boxNiceName target) $ hostKeyAlias target <> userHost user targetHost <> args
+      tmpKnownHosts <- liftIO $ knownHostsFile target
+      go runType (boxNiceName target) $
+        [ "-o", "UserKnownHostsFile=" <> tmpKnownHosts ]
+        <> userHost user targetHost <> args
     ---
     go runtype boxname args' = case runtype of
       DryRun  ->
-        liftIO (print ("ssh" : args'))
+        liftIO $ do
+            (print ("ssh" : args'))
 
       RealRun -> do
         -- Set the title of the terminal.
@@ -285,6 +292,36 @@ identityEnv :: IO Text
 identityEnv = do
   home <- getHomeDirectory
   T.pack . fromMaybe (home </> ".ssh/ambiata_rsa") <$> lookupEnv "BOX_IDENTITY"
+
+knownHostsFile :: Box -> IO Text
+knownHostsFile box =
+  maybe (tmpKnownHostsFile box) (return . T.pack) =<< lookupEnv "BOX_KNOWN_HOSTS"
+
+tmpKnownHostsFile :: Box -> IO Text
+tmpKnownHostsFile target = do
+  -- Generate and populate a temporary SSH known_hosts file.
+  -- The file will be created in /tmp/box/ (just to avoid poluting /tmp too
+  -- much). The directory is created world RWX, but the temp file's access will
+  -- be set by the users umask setting.
+  -- Returns the `FilePath` of the temp file as `Text`.
+  tmpdir <- (\t -> t </> "box") <$> getTemporaryDirectory
+  user <- fromMaybe "whoami" <$> lookupEnv "USER"
+  mkWorldAccessDir tmpdir
+  (fp, hdl) <- openTempFile tmpdir user
+  T.hPutStrLn hdl $ unHost (selectHost ExternalHost target) <> " " <> unHostKey (boxHostKey target)
+  hClose hdl
+  return $ T.pack fp
+  where
+    swallowException :: SomeException -> IO ()
+    swallowException _ = return ()
+
+    mkWorldAccessDir :: FilePath -> IO ()
+    mkWorldAccessDir fp = bracket
+      (setFileCreationMask nullFileMode) -- Set world access
+      setFileCreationMask                -- Restore original access
+      -- `createDriectory` thows an exception if the directory already exists
+      -- so we just swallow it.
+      $ const $ catch (PD.createDirectory fp accessModes) swallowException
 
 cacheEnv :: Environment -> IO FilePath
 cacheEnv env = do

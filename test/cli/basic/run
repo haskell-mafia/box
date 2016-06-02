@@ -5,6 +5,7 @@ BOX=${1:-./dist/build/box/box}
 export BOX_STORE=test/cli/basic/v3
 export BOX_USER=pwadler
 export BOX_IDENTITY=~/.ssh/endofunctor_rsa
+export BOX_KNOWN_HOSTS=/tmp/box_test_known_hosts
 export BOX_ANSI_ESCAPES=0
 
 $BOX -v
@@ -64,7 +65,7 @@ EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o HostKeyAlias=box.amb
 ACTUAL=$($BOX --dry-run ssh -s acme:lab)
 check "$EXPECT" "$ACTUAL"
 
-EXPECT='["ssh","-o","HostKeyAlias=box.ambiata.gateway.apple.gray.7.i-fe6988ed.jump","'$BOX_USER'@54.1.1.6"]'
+EXPECT='["ssh","-o","UserKnownHostsFile='$BOX_KNOWN_HOSTS'","'$BOX_USER'@54.1.1.6"]'
 ACTUAL=$($BOX --dry-run ssh :gateway:)
 check "$EXPECT" "$ACTUAL"
 
@@ -132,3 +133,5 @@ EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o HostKeyAlias=box.asg
 echo $CMD
 ACTUAL=$($CMD)
 check "$EXPECT" "$ACTUAL"
+
+rm -f $BOX_KNOWN_HOSTS
