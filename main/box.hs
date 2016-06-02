@@ -10,7 +10,6 @@ import           BuildInfo_ambiata_box
 
 import           Box
 
-import           Control.Exception -- (Exception, catch)
 import           Control.Monad.IO.Class
 
 import           Data.List (sort)
@@ -26,7 +25,6 @@ import           System.Environment
 import           System.Exit
 import           System.FilePath ((</>), (<.>), dropFileName)
 import           System.IO
-import qualified System.Posix.Directory as PD
 import           System.Posix.Files
 import           System.Posix.Process
 import           System.Posix.User
@@ -312,16 +310,10 @@ tmpKnownHostsFile target = do
   hClose hdl
   return $ T.pack fp
   where
-    swallowException :: SomeException -> IO ()
-    swallowException _ = return ()
-
     mkWorldAccessDir :: FilePath -> IO ()
-    mkWorldAccessDir fp = bracket
-      (setFileCreationMask nullFileMode) -- Set world access
-      setFileCreationMask                -- Restore original access
-      -- `createDriectory` thows an exception if the directory already exists
-      -- so we just swallow it.
-      $ const $ catch (PD.createDirectory fp accessModes) swallowException
+    mkWorldAccessDir fp =
+        createDirectoryIfMissing True fp >> setFileMode fp accessModes
+
 
 cacheEnv :: Environment -> IO FilePath
 cacheEnv env = do
