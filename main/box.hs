@@ -10,6 +10,7 @@ import           BuildInfo_ambiata_box
 
 import           Box
 
+import           Control.Exception (bracket)
 import           Control.Monad.IO.Class
 
 import           Data.List (sort)
@@ -303,11 +304,11 @@ tmpKnownHostsFile gateway mtarget = do
   tmpdir <- (</> "box") <$> getTemporaryDirectory
   user <- getEffectiveUserName
   mkWorldAccessDir tmpdir
-  (fp, hdl) <- openTempFile tmpdir user
-  writeHostKey hdl ExternalHost gateway
-  maybe (return ()) (writeHostKey hdl InternalHost) mtarget
-  hClose hdl
-  return $ T.pack fp
+  fpath <- bracket (openTempFile tmpdir user) (hClose . snd) $ \(fp, hdl) -> do
+                     writeHostKey hdl ExternalHost gateway
+                     maybe (return ()) (writeHostKey hdl InternalHost) mtarget
+                     return fp
+  pure $ T.pack fpath
   where
     writeHostKey hdl htype box =
       T.hPutStrLn hdl $ unHost (selectHost htype box) <> " " <> unHostKey (boxHostKey box)
