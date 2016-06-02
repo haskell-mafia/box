@@ -123,30 +123,28 @@ boxSSH runType gwType qTarget args boxes = do
                    BoxNoMatches -> BoxNoGateway
                    e            -> e) $ randomBoxOfQuery qGateway boxes
     boxNiceName b  = unName (boxName b) <> "." <> unInstanceId (boxInstance b)
-    boxAlias    b  = "box." <> boxNiceName b <> ".jump"
-    -- Keep track of host keys using the target's somewhat unique name
-    hostKeyAlias t = ["-o", "HostKeyAlias=" <> boxAlias t]
     userHost u th  = [u <> "@" <> th]
     ---
     goJump target user ident = do
       gateway <- randomGw
       let targetHost = unHost (selectHost InternalHost target)
           gatewayHost = unHost (selectHost ExternalHost gateway)
+      tmpKnownHosts <- liftIO $ knownHostsFile gateway (Just target)
       go runType (boxNiceName target) $
         [ -- ProxyCommand bounces us off the gateway. Note that we pipe
           -- netcat's stderr to /dev/null to avoid the annoying 'Killed
           -- by signal 1.' message when the session finishes.
           "-o", "ProxyCommand=ssh" <> " -i " <> ident
-                                   <> " -o HostKeyAlias=" <> boxAlias gateway
+                                   <> " -o UserKnownHostsFile=" <> tmpKnownHosts
                                    <> " " <> user <> "@" <> gatewayHost
                                    <> " nc %h %p 2>/dev/null"
-        ] <> hostKeyAlias target      -- SSH host alias
+        ] <> [ "-o", "UserKnownHostsFile=" <> tmpKnownHosts ]
           <> userHost user targetHost -- Connect to target
           <> args                     -- Pass on remaining args to SSH
     ---
     goDirect target user _ident = do
       let targetHost = unHost (selectHost ExternalHost target)
-      tmpKnownHosts <- liftIO $ knownHostsFile target
+      tmpKnownHosts <- liftIO $ knownHostsFile target Nothing
       go runType (boxNiceName target) $
         [ "-o", "UserKnownHostsFile=" <> tmpKnownHosts ]
         <> userHost user targetHost <> args
@@ -291,25 +289,29 @@ identityEnv = do
   home <- getHomeDirectory
   T.pack . fromMaybe (home </> ".ssh/ambiata_rsa") <$> lookupEnv "BOX_IDENTITY"
 
-knownHostsFile :: Box -> IO Text
-knownHostsFile box =
-  maybe (tmpKnownHostsFile box) (return . T.pack) =<< lookupEnv "BOX_KNOWN_HOSTS"
+knownHostsFile :: Box -> Maybe Box -> IO Text
+knownHostsFile gateway mtarget =
+  maybe (tmpKnownHostsFile gateway mtarget) (return . T.pack) =<< lookupEnv "BOX_KNOWN_HOSTS"
 
-tmpKnownHostsFile :: Box -> IO Text
-tmpKnownHostsFile target = do
+tmpKnownHostsFile :: Box -> Maybe Box -> IO Text
+tmpKnownHostsFile gateway mtarget = do
   -- Generate and populate a temporary SSH known_hosts file.
   -- The file will be created in /tmp/box/ (just to avoid poluting /tmp too
   -- much). The directory is created world RWX, but the temp file's access will
   -- be set by the users umask setting.
   -- Returns the `FilePath` of the temp file as `Text`.
-  tmpdir <- (\t -> t </> "box") <$> getTemporaryDirectory
+  tmpdir <- (</> "box") <$> getTemporaryDirectory
   user <- fromMaybe "whoami" <$> lookupEnv "USER"
   mkWorldAccessDir tmpdir
   (fp, hdl) <- openTempFile tmpdir user
-  T.hPutStrLn hdl $ unHost (selectHost ExternalHost target) <> " " <> unHostKey (boxHostKey target)
+  writeHostKey hdl ExternalHost gateway
+  maybe (return ()) (writeHostKey hdl InternalHost) mtarget
   hClose hdl
   return $ T.pack fp
   where
+    writeHostKey hdl htype box =
+      T.hPutStrLn hdl $ unHost (selectHost htype box) <> " " <> unHostKey (boxHostKey box)
+
     mkWorldAccessDir :: FilePath -> IO ()
     mkWorldAccessDir fp =
         createDirectoryIfMissing True fp >> setFileMode fp accessModes
