@@ -301,7 +301,7 @@ tmpKnownHostsFile gateway mtarget = do
   -- be set by the users umask setting.
   -- Returns the `FilePath` of the temp file as `Text`.
   tmpdir <- (</> "box") <$> getTemporaryDirectory
-  user <- fromMaybe "whoami" <$> lookupEnv "USER"
+  user <- getEffectiveUserName
   mkWorldAccessDir tmpdir
   (fp, hdl) <- openTempFile tmpdir user
   writeHostKey hdl ExternalHost gateway
