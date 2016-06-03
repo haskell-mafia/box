@@ -49,7 +49,7 @@ check() {
   fi
 }
 
-EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o HostKeyAlias=box.ambiata.gateway.apple.gray.7.i-fe6988ed.jump '$BOX_USER'@54.1.1.6 nc %h %p 2>/dev/null","-o","HostKeyAlias=box.acme.lab.kermit.brown.717.i-a6g1d97a.jump","'$BOX_USER'@192.31.14.3"]'
+EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@54.1.1.6 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@192.31.14.3"]'
 ACTUAL=$($BOX --dry-run ssh acme:lab)
 check "$EXPECT" "$ACTUAL"
 
@@ -61,7 +61,7 @@ EXPECT='ambiata'
 ACTUAL=$($BOX ls ambiata | tail -1 | awk '{print $1}' | head)
 check "$EXPECT" "$ACTUAL"
 
-EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o HostKeyAlias=box.ambiata.gatewaysecure.asg.gatewaysecure.muppets.1eb8c31e604a2e35950ae4008b1114d6.i-8e124d51.jump '$BOX_USER'@54.1.1.8 nc %h %p 2>/dev/null","-o","HostKeyAlias=box.acme.lab.kermit.brown.717.i-a6g1d97a.jump","'$BOX_USER'@192.31.14.3"]'
+EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@54.1.1.8 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@192.31.14.3"]'
 ACTUAL=$($BOX --dry-run ssh -s acme:lab)
 check "$EXPECT" "$ACTUAL"
 
@@ -123,13 +123,13 @@ check "$EXPECT" "$ACTUAL"
 
 # Test ssh and ssh -s finds correct params from correct env
 CMD="$BOX -e altenv --dry-run ssh ambiata:totp:asg.totp.helium.blargho"
-EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o HostKeyAlias=box.ambiata.gateway.mapple.gary.7.i-fe6988ed.jump '$BOX_USER'@54.22.33.6 nc %h %p 2>/dev/null","-o","HostKeyAlias=box.asg.totp.helium.blargho.i-c841127j.jump","'$BOX_USER'@172.131.22.14"]'
+EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@54.22.33.6 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@172.131.22.14"]'
 echo $CMD
 ACTUAL=$($CMD)
 check "$EXPECT" "$ACTUAL"
 
 CMD="$BOX -e altenv --dry-run ssh -s ambiata:totp:asg.totp.helium.blargho"
-EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o HostKeyAlias=box.asg.gatewaysecure.helium.bingo.i-9691127j.jump '$BOX_USER'@152.65.153.178 nc %h %p 2>/dev/null","-o","HostKeyAlias=box.asg.totp.helium.blargho.i-c841127j.jump","'$BOX_USER'@172.131.22.14"]'
+EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@152.65.153.178 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@172.131.22.14"]'
 echo $CMD
 ACTUAL=$($CMD)
 check "$EXPECT" "$ACTUAL"
