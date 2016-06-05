@@ -143,11 +143,11 @@ boxSSH runType gwType qTarget args boxes = do
           <> userHost user targetHost -- Connect to target
           <> args                     -- Pass on remaining args to SSH
     ---
-    goDirect target user _ident = do
+    goDirect target user ident = do
       let targetHost = unHost (selectHost ExternalHost target)
       tmpKnownHosts <- liftIO $ knownHostsFile target Nothing
       go runType (boxNiceName target) $
-        [ "-o", "UserKnownHostsFile=" <> tmpKnownHosts ]
+        [ "-i", ident, "-o", "UserKnownHostsFile=" <> tmpKnownHosts ]
         <> userHost user targetHost <> args
     ---
     go runtype boxname args' = case runtype of
