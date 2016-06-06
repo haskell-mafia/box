@@ -65,7 +65,7 @@ EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/
 ACTUAL=$($BOX --dry-run ssh -s acme:lab)
 check "$EXPECT" "$ACTUAL"
 
-EXPECT='["ssh","-i","~/.ssh/endofunctor_rsa","-o","UserKnownHostsFile='$BOX_KNOWN_HOSTS'","'$BOX_USER'@54.1.1.6"]'
+EXPECT='["ssh","-i","'$BOX_IDENTITY'","-o","UserKnownHostsFile='$BOX_KNOWN_HOSTS'","'$BOX_USER'@54.1.1.6"]'
 ACTUAL=$($BOX --dry-run ssh :gateway:)
 check "$EXPECT" "$ACTUAL"
 
