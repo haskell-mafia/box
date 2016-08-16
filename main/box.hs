@@ -42,7 +42,7 @@ import           X.Options.Applicative
 
 data BoxCommand =
     BoxIP    Query HostType
-  | BoxSSH   GatewayType Query [SSHArg]
+  | BoxSSH   GatewayType Query SSHType [SSHArg]
   | BoxRSH   GatewayType Query [SSHArg]
   | BoxRSync GatewayType Query [SSHArg]
   | BoxList  Query
@@ -51,6 +51,11 @@ data BoxCommand =
 data HostType =
     ExternalHost
   | InternalHost
+  deriving (Eq, Show)
+
+data SSHType =
+    AutoSSH
+  | PlainSSH
   deriving (Eq, Show)
 
 type SSHArg = Text
@@ -90,7 +95,7 @@ main = do
     Safe (RunCommand r cmd) -> do
       case cmd of
         BoxIP     q host   -> runCommand env (boxIP  r q host)
-        BoxSSH    g q args -> runCommand env (boxSSH r g q args)
+        BoxSSH    g q a args -> runCommand env (boxSSH r g q a args)
         BoxRSH    g q args -> runCommand env (boxRSH r g q args)
         BoxRSync  g q args -> runCommand env (const $ boxRSync r g q args)
         BoxList   q        -> runCommand env (boxList q)
@@ -110,8 +115,8 @@ boxIP _ q hostType boxes = do
   b <- randomBoxOfQuery q boxes
   liftIO (putStrLn . T.unpack . unHost . selectHost hostType $ b)
 
-boxSSH :: RunType -> GatewayType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
-boxSSH runType gwType qTarget args boxes = do
+boxSSH :: RunType -> GatewayType -> Query -> SSHType -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
+boxSSH runType gwType qTarget autoSSH args boxes = do
   target  <- randomBoxOfQuery qTarget  boxes
   user    <- liftIO userEnv
   ident   <- liftIO identityEnv
@@ -124,6 +129,13 @@ boxSSH runType gwType qTarget args boxes = do
                    BoxNoMatches -> BoxNoGateway
                    e            -> e) $ randomBoxOfQuery qGateway boxes
     boxNiceName b  = unName (boxName b) <> "." <> unInstanceId (boxInstance b)
+    autoSSHArgs = [ -- We are disabling autossh's monitoring port
+                    -- and choosing to use ServerAliveInterval
+                    -- and ServerAliveCountMax instead
+                    -- more at: https://www.everythingcli.org/ssh-tunnelling-for-fun-and-profit-autossh/
+                    "-M 0 "
+                  , " -o \"ServerAliveInterval 30\""
+                  , " -o \"ServerAliveCountMax 3\""]
     userHost u th  = [u <> "@" <> th]
     ---
     goJump target user ident = do
@@ -153,7 +165,11 @@ boxSSH runType gwType qTarget args boxes = do
     go runtype boxname args' = case runtype of
       DryRun  ->
         liftIO $ do
-            (print ("ssh" : args'))
+          case autoSSH of
+            PlainSSH ->
+              (print ("ssh" : args'))
+            AutoSSH ->
+              (print ("autossh" : (autoSSHArgs <> args')))
 
       RealRun -> do
         -- Set the title of the terminal.
@@ -165,7 +181,11 @@ boxSSH runType gwType qTarget args boxes = do
             hFlush stdout
 
         -- This call never returns, the current process is replaced by 'ssh'.
-        liftIO (exec "ssh" args')
+        case autoSSH of
+          PlainSSH ->
+            liftIO (exec "ssh" args')
+          AutoSSH ->
+            liftIO (exec "autossh" (autoSSHArgs <> args'))
 
 boxRSH :: RunType -> GatewayType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
 boxRSH runType gwType qTarget args boxes = do
@@ -173,7 +193,7 @@ boxRSH runType gwType qTarget args boxes = do
     [] ->
       left BoxMissingRSHHost
     ("":xs) ->
-      boxSSH runType gwType qTarget xs boxes
+      boxSSH runType gwType qTarget PlainSSH xs boxes
     (h:_) ->
       left $ BoxInvalidRSHHost h
 
@@ -362,7 +382,7 @@ boxCommands =
             (BoxIP    <$> queryP <*> hostTypeP)
 
   , Command "ssh" "SSH to a box."
-            (BoxSSH   <$> gatewayP <*> queryP <*> many sshArgP)
+            (BoxSSH   <$> gatewayP <*> queryP <*> autoP <*> many sshArgP)
 
   , Command "rsh" "SSH to a box with a shell interface compatible with rsync."
             (BoxRSH   <$> gatewayP <*> queryP <*> many sshArgP )
@@ -380,6 +400,13 @@ hostTypeP =
   flag InternalHost ExternalHost $
        long "external"
     <> help "Display the external ip address rather than the internal one (which is the default)."
+
+autoP :: Parser SSHType
+autoP =
+  flag PlainSSH AutoSSH $
+       long "auto"
+    <> short 'a'
+    <> help "Use autossh. (Requires autossh to be installed locally)"
 
 gatewayP :: Parser GatewayType
 gatewayP =
