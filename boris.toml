@@ -1,0 +1,9 @@
+[boris]
+version = 1
+
+[build.dist-7-10]
+
+[build.branches-7-10]
+
+[build.validate]
+command = [["validate-respect"]]
