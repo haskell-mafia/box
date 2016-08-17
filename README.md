@@ -45,6 +45,19 @@ box rsync vapour:dev:kermit -- -aH :/mnt/me/plots plots
 #            all you need for almost all cases.
 ```
 
+### AutoSSH
+
+To make your ssh tunnel persistent, `box ssh` gives you an option for using `autossh.`
+
+You will need to [install autossh locally.](https://www.everythingcli.org/ssh-tunnelling-for-fun-and-profit-autossh/)
+
+Then use `--auto` with `box ssh.`
+
+```
+# Example usage of --auto with box ssh
+box -e ci ssh --auto :gateway -- -D 6666 -N -f
+```
+
 ### Environment Variables
 
 |Variable           | Default              | Description |
