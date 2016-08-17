@@ -65,8 +65,18 @@ EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/
 ACTUAL=$($BOX --dry-run ssh -s acme:lab)
 check "$EXPECT" "$ACTUAL"
 
-EXPECT='["autossh","-M 0 "," -o \"ServerAliveInterval 30\""," -o \"ServerAliveCountMax 3\"","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@54.1.1.8 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@192.31.14.3"]'
+EXPECT='["autossh","-M","0","-o","ServerAliveInterval 30","-o","ServerAliveCountMax 3","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@54.1.1.8 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@192.31.14.3"]'
 ACTUAL=$($BOX --dry-run ssh --auto -s acme:lab)
+check "$EXPECT" "$ACTUAL"
+
+# running box ssh in the background - pass -f as an ssh arg
+EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@54.1.1.8 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@192.31.14.3","-f"]'
+ACTUAL=$($BOX --dry-run ssh -b -s acme:lab)
+check "$EXPECT" "$ACTUAL"
+
+# with --auto, pass -f to autossh instead
+EXPECT='["autossh","-f","-M","0","-o","ServerAliveInterval 30","-o","ServerAliveCountMax 3","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@54.1.1.8 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@192.31.14.3"]'
+ACTUAL=$($BOX --dry-run ssh --auto -b -s acme:lab)
 check "$EXPECT" "$ACTUAL"
 
 EXPECT='["ssh","-i","'$BOX_IDENTITY'","-o","UserKnownHostsFile='$BOX_KNOWN_HOSTS'","'$BOX_USER'@54.1.1.6"]'
