@@ -10,3 +10,9 @@
 
 [build.submodules]
   command = [["dangling-refs"]]
+
+[build.submodules-branches]
+  command = [["dangling-refs"]]
+
+[build.rebased]
+  command = [["rebased"]]
