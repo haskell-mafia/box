@@ -11,4 +11,10 @@
   git = "refs/heads/master"
 
 [build.submodules]
-  git = "refs/heads/**"
+  git = "refs/heads/master"
+
+[build.submodules-branches]
+  git = "refs/heads/topic/*"
+
+[build.rebased]
+  git = "refs/heads/master"
