@@ -55,7 +55,7 @@ Then use `--auto` with `box ssh.`
 
 ```
 # Example usage of --auto with box ssh
-box -e ci ssh --auto :gateway -- -D 6666 -N -f
+box -e ci ssh --auto :gateway -- -D 6666 -N
 ```
 
 ### Environment Variables
