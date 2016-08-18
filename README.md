@@ -27,21 +27,21 @@ box ls vapour
 box ls :live
 box ls :dev
 
-# rsync source.txt in the current working directory to a file remote.txt 
+# rsync source.txt in the current working directory to a file remote.txt
 # in your home directory on vapour:dev:kermit
 box rsync vapour:dev:kermit -- -aH source.txt :remote.txt
 
-# rsync source.txt in the current working directory to an absolute file 
+# rsync source.txt in the current working directory to an absolute file
 # path /tmp/remote.txt in your home directory on vapour:dev:kermit
 box rsync vapour:dev:kermit -- -aH source.txt :/tmp/remote.txt
 
-# rsync remote.txt in your remote home directory to a file local.txt 
+# rsync remote.txt in your remote home directory to a file local.txt
 box rsync vapour:dev:kermit -- -aH :remote.txt local.txt
 
 # rsync an absolute directory in to a local dir
 box rsync vapour:dev:kermit -- -aH :/mnt/me/plots plots
 
-# NOTE WELL: -aH is the 'just works' options for rsync, and should be 
+# NOTE WELL: -aH is the 'just works' options for rsync, and should be
 #            all you need for almost all cases.
 ```
 
@@ -112,7 +112,7 @@ box ssh vapour:dev:fozzie -- -L 8787:localhost:8787
 box ssh [-s|--secure] [filter]
 ```
 
-Note: The flag needs to come after the `ssh` parameter. Order matters. 
+Note: The flag needs to come after the `ssh` parameter. Order matters.
 
 [More information on SSH 2-Factor-Authentication](https://github.com/ambiata/architecture/blob/master/operations/ssh-2fa.md)
 

@@ -42,7 +42,7 @@ import           X.Options.Applicative
 
 data BoxCommand =
     BoxIP    Query HostType
-  | BoxSSH   GatewayType Query SSHType [SSHArg]
+  | BoxSSH   GatewayType ProcessType Query SSHType [SSHArg]
   | BoxRSH   GatewayType Query [SSHArg]
   | BoxRSync GatewayType Query [SSHArg]
   | BoxList  Query
@@ -56,6 +56,11 @@ data HostType =
 data SSHType =
     AutoSSH
   | PlainSSH
+  deriving (Eq, Show)
+
+data ProcessType =
+    ForeGround
+  | BackGround
   deriving (Eq, Show)
 
 type SSHArg = Text
@@ -95,7 +100,7 @@ main = do
     Safe (RunCommand r cmd) -> do
       case cmd of
         BoxIP     q host   -> runCommand env (boxIP  r q host)
-        BoxSSH    g q a args -> runCommand env (boxSSH r g q a args)
+        BoxSSH    g p q a args -> runCommand env (boxSSH r g p q a args)
         BoxRSH    g q args -> runCommand env (boxRSH r g q args)
         BoxRSync  g q args -> runCommand env (const $ boxRSync r g q args)
         BoxList   q        -> runCommand env (boxList q)
@@ -115,8 +120,8 @@ boxIP _ q hostType boxes = do
   b <- randomBoxOfQuery q boxes
   liftIO (putStrLn . T.unpack . unHost . selectHost hostType $ b)
 
-boxSSH :: RunType -> GatewayType -> Query -> SSHType -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
-boxSSH runType gwType qTarget autoSSH args boxes = do
+boxSSH :: RunType -> GatewayType -> ProcessType -> Query -> SSHType -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
+boxSSH runType gwType pType qTarget autoSSH args' boxes = do
   target  <- randomBoxOfQuery qTarget  boxes
   user    <- liftIO userEnv
   ident   <- liftIO identityEnv
@@ -129,13 +134,7 @@ boxSSH runType gwType qTarget autoSSH args boxes = do
                    BoxNoMatches -> BoxNoGateway
                    e            -> e) $ randomBoxOfQuery qGateway boxes
     boxNiceName b  = unName (boxName b) <> "." <> unInstanceId (boxInstance b)
-    autoSSHArgs = [ -- We are disabling autossh's monitoring port
-                    -- and choosing to use ServerAliveInterval
-                    -- and ServerAliveCountMax instead
-                    -- more at: https://www.everythingcli.org/ssh-tunnelling-for-fun-and-profit-autossh/
-                    "-M 0 "
-                  , " -o \"ServerAliveInterval 30\""
-                  , " -o \"ServerAliveCountMax 3\""]
+    (autoSSHArgs, args) = setupAutoSSHArgs autoSSH pType args'
     userHost u th  = [u <> "@" <> th]
     ---
     goJump target user ident = do
@@ -162,14 +161,14 @@ boxSSH runType gwType qTarget autoSSH args boxes = do
         [ "-i", ident, "-o", "UserKnownHostsFile=" <> tmpKnownHosts ]
         <> userHost user targetHost <> args
     ---
-    go runtype boxname args' = case runtype of
+    go runtype boxname args'' = case runtype of
       DryRun  ->
         liftIO $ do
           case autoSSH of
             PlainSSH ->
-              (print ("ssh" : args'))
+              (print ("ssh" : args''))
             AutoSSH ->
-              (print ("autossh" : (autoSSHArgs <> args')))
+              (print ("autossh" : (autoSSHArgs <> args'')))
 
       RealRun -> do
         -- Set the title of the terminal.
@@ -183,9 +182,9 @@ boxSSH runType gwType qTarget autoSSH args boxes = do
         -- This call never returns, the current process is replaced by 'ssh'.
         case autoSSH of
           PlainSSH ->
-            liftIO (exec "ssh" args')
+            liftIO (exec "ssh" args'')
           AutoSSH ->
-            liftIO (exec "autossh" (autoSSHArgs <> args'))
+            liftIO (exec "autossh" (autoSSHArgs <> args''))
 
 boxRSH :: RunType -> GatewayType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
 boxRSH runType gwType qTarget args boxes = do
@@ -193,7 +192,7 @@ boxRSH runType gwType qTarget args boxes = do
     [] ->
       left BoxMissingRSHHost
     ("":xs) ->
-      boxSSH runType gwType qTarget PlainSSH xs boxes
+      boxSSH runType gwType ForeGround qTarget PlainSSH xs boxes
     (h:_) ->
       left $ BoxInvalidRSHHost h
 
@@ -382,7 +381,7 @@ boxCommands =
             (BoxIP    <$> queryP <*> hostTypeP)
 
   , Command "ssh" "SSH to a box."
-            (BoxSSH   <$> gatewayP <*> queryP <*> autoP <*> many sshArgP)
+            (BoxSSH   <$> gatewayP <*> backGroundP <*> queryP <*> autoP <*> many sshArgP)
 
   , Command "rsh" "SSH to a box with a shell interface compatible with rsync."
             (BoxRSH   <$> gatewayP <*> queryP <*> many sshArgP )
@@ -430,6 +429,34 @@ sshArgP =
   argument textRead $
        metavar "SSH_ARGUMENTS"
     <> help "Extra arguments to pass to ssh."
+
+backGroundP :: Parser ProcessType
+backGroundP =
+  flag ForeGround BackGround $
+     short 'b'
+  <> help "Run in the background."
+
+
+setupAutoSSHArgs :: SSHType -> ProcessType -> [SSHArg] -> ([SSHArg], [SSHArg])
+setupAutoSSHArgs autoSSH pType sshArgs =
+  let
+    autoSSHArgs = [ -- We are disabling autossh's monitoring port
+                    -- and choosing to use ServerAliveInterval
+                    -- and ServerAliveCountMax instead
+                    -- more at: https://www.everythingcli.org/ssh-tunnelling-for-fun-and-profit-autossh/
+                    "-M", "0"
+                  , "-o", "ServerAliveInterval 30"
+                  , "-o", "ServerAliveCountMax 3"]
+  in
+    case (autoSSH, pType) of
+      (PlainSSH, ForeGround) ->
+        ([], sshArgs)
+      (PlainSSH, BackGround) ->
+        ([], sshArgs <> ["-f"])
+      (AutoSSH, ForeGround) ->
+        (autoSSHArgs, sshArgs)
+      (AutoSSH, BackGround) ->
+        (["-f"] <> autoSSHArgs, sshArgs)
 
 filterCompleter :: Completer
 filterCompleter = mkCompleter $ \arg -> do
