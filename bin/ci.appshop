@@ -1,6 +1,6 @@
 #!/bin/sh -exu
 
-$(dirname $0)/ci.branches
+./mafia build
 
 VERSION=$(cat $(dirname $0)/../gen/version.txt)
 
