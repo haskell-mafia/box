@@ -148,4 +148,10 @@ echo $CMD
 ACTUAL=$($CMD)
 check "$EXPECT" "$ACTUAL"
 
+CMD="$BOX ls -m"
+EXPECT=$($BOX ls | tail -n +2 | perl -pe 's/ +/	/g')
+echo $CMD
+ACTUAL=$($CMD)
+check "$EXPECT" "$ACTUAL"
+
 rm -f $BOX_KNOWN_HOSTS
