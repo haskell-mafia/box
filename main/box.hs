@@ -45,7 +45,12 @@ data BoxCommand =
   | BoxSSH   GatewayType ProcessType Query SSHType [SSHArg]
   | BoxRSH   GatewayType Query [SSHArg]
   | BoxRSync GatewayType Query [SSHArg]
-  | BoxList  Query
+  | BoxList  MachineReadable Query
+  deriving (Eq, Show)
+
+data MachineReadable =
+    MachineReadable
+  | HumanReadable
   deriving (Eq, Show)
 
 data HostType =
@@ -103,7 +108,7 @@ main = do
         BoxSSH    g p q a args -> runCommand env (boxSSH r g p q a args)
         BoxRSH    g q args -> runCommand env (boxRSH r g q args)
         BoxRSync  g q args -> runCommand env (const $ boxRSync r g q args)
-        BoxList   q        -> runCommand env (boxList q)
+        BoxList   m q        -> runCommand env (boxList m q)
 
 runCommand :: Environment -> ([Box] -> EitherT BoxCommandError IO ()) -> IO ()
 runCommand env cmd = orDie boxCommandErrorRender $ do
@@ -207,8 +212,9 @@ boxRSync runType gwType qTarget args = do
     RealRun -> do
       liftIO (exec "rsync" args')
 
-boxList :: Query -> [Box] -> EitherT BoxCommandError IO ()
-boxList q boxes = liftIO $ do
+boxList :: MachineReadable -> Query -> [Box] -> EitherT BoxCommandError IO ()
+boxList o q boxes = liftIO $ case o of
+  HumanReadable -> do
     putStrLn ("total " <> show (length sorted))
 
     PB.printBox $ col PB.left  (unClient     . boxClient)
@@ -217,6 +223,18 @@ boxList q boxes = liftIO $ do
              <++> col PB.left  (unHost       . boxHost)
              <++> col PB.left  (unHost       . boxPublicHost)
              <++> col PB.left  (unInstanceId . boxInstance)
+  MachineReadable ->
+    let
+      fmt b = T.intercalate "\t" [
+          unClient $ boxClient b
+        , unFlavour $ boxFlavour b
+        , unName $ boxShortName b
+        , unHost $ boxHost b
+        , unHost $ boxPublicHost b
+        , unInstanceId $ boxInstance b
+        ]
+    in
+    mapM_ T.putStrLn $ fmt <$> sorted
   where
     sorted       = sort (query q boxes)
     col align f  = PB.vcat align (fmap (PB.text . T.unpack . f) sorted)
@@ -390,9 +408,16 @@ boxCommands =
             (BoxRSync <$> gatewayP <*> queryP <*> many sshArgP)
 
   , Command "ls"  "List available boxes."
-            (BoxList  <$> (queryP <|> pure matchAll))
+            (BoxList  <$> machineReadableP <*> (queryP <|> pure matchAll))
 
   ]
+
+machineReadableP :: Parser MachineReadable
+machineReadableP =
+  flag HumanReadable MachineReadable $
+     long "machine-readable"
+  <> short 'm'
+  <> help "Format query results for machine consumers rather than humans."
 
 hostTypeP :: Parser HostType
 hostTypeP =
