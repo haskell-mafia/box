@@ -102,7 +102,7 @@ main = do
         BoxIP     q host   -> runCommand env (boxIP  r q host)
         BoxSSH    g p q a args -> runCommand env (boxSSH r g p q a args)
         BoxRSH    g q args -> runCommand env (boxRSH r g q args)
-        BoxRSync  g q args -> runCommand env (const $ boxRSync r g q args)
+        BoxRSync  g q args -> runCommand env (const $ boxRSync env r g q args)
         BoxList   q        -> runCommand env (boxList q)
 
 runCommand :: Environment -> ([Box] -> EitherT BoxCommandError IO ()) -> IO ()
@@ -196,11 +196,15 @@ boxRSH runType gwType qTarget args boxes = do
     (h:_) ->
       left $ BoxInvalidRSHHost h
 
-boxRSync :: RunType -> GatewayType -> Query -> [SSHArg] -> EitherT BoxCommandError IO ()
-boxRSync runType gwType qTarget args = do
+boxRSync :: Environment -> RunType -> GatewayType -> Query -> [SSHArg] -> EitherT BoxCommandError IO ()
+boxRSync env runType gwType qTarget args = do
   box <- liftIO getExecutablePath
-  let secure = if gwType == GatewaySecure then "--secure" else ""
-  let args' = [ "--rsh", T.intercalate " " [T.pack box, "rsh", secure, queryRender qTarget, "--"]] <> args
+  let
+    secure = if gwType == GatewaySecure then "--secure" else ""
+    envarg = case env of
+               SomeEnv x -> "-e " <> x
+               DefaultEnv -> ""
+    args' = [ "--rsh", T.intercalate " " [T.pack box, envarg, "rsh", secure, queryRender qTarget, "--"]] <> args
   case runType of
     DryRun  ->
       liftIO (print ("rsync" : args'))
