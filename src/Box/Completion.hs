@@ -1,7 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-
 module Box.Completion (
     completions
   ) where
@@ -9,7 +8,6 @@ module Box.Completion (
 import           Box.Data
 
 import           Data.List (nub)
-import           Data.Text (Text)
 import qualified Data.Text as T
 
 import           P

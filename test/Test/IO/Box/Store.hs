@@ -7,10 +7,12 @@ module Test.IO.Box.Store where
 import           Box.Data
 import           Box.Store
 
+import           Mismi (AWS)
+
 import           P
 
 import           Test.Box.Arbitrary ()
-import           Test.Mismi.S3
+import           Test.Mismi.S3 (testAWS, newFilePath, newAddress)
 import           Test.QuickCheck
 
 

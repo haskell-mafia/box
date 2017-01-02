@@ -1,13 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-
 module Box.Cache (
       readCache
     , writeCache
     ) where
 
 import           Control.Exception (IOException, handle)
-import           Data.Text         as T (Text)
 import qualified Data.Text.IO      as T
 import           Data.Time         (NominalDiffTime, diffUTCTime, getCurrentTime)
 
