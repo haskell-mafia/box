@@ -7,35 +7,48 @@
 module Main (main) where
 
 import           BuildInfo_ambiata_box
+import           DependencyInfo_ambiata_box
 
 import           Box
 
 import           Control.Exception (bracket)
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Class (MonadIO(..))
 
 import           Data.List (sort)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
-import           Options.Applicative
+import           Mismi (Region(..))
+import qualified Mismi as Mismi
+import           Mismi.Amazonka (Credentials(..))
+import qualified Mismi.Amazonka as Mismi (newEnv)
+import qualified Mismi.S3 as Mismi
 
 import           P
 
-import           System.Directory
-import           System.Environment
-import           System.Exit
+import           System.Directory (createDirectoryIfMissing)
+import           System.Directory (getHomeDirectory, getTemporaryDirectory)
+import           System.Environment (lookupEnv, getArgs, getProgName, getExecutablePath)
+import           System.Exit (exitSuccess)
 import           System.FilePath ((</>), (<.>), dropFileName)
-import           System.IO
-import           System.Posix.Files
-import           System.Posix.Process
-import           System.Posix.User
+import           System.IO (IO, FilePath, BufferMode(..))
+import           System.IO (hClose, hFlush, hIsTerminalDevice, hSetBuffering)
+import           System.IO (stdout, stderr, putStrLn, print, openTempFile)
+import           System.Posix.Files (setFileMode, accessModes)
+import           System.Posix.Process (executeFile)
+import           System.Posix.User (getEffectiveUserName)
 
 import           Text.PrettyPrint.Boxes ((<+>))
 import qualified Text.PrettyPrint.Boxes as PB
 
-import           X.Control.Monad.Trans.Either
+import           X.Control.Monad.Trans.Either (EitherT, runEitherT, left, hoistEither)
 import           X.Control.Monad.Trans.Either.Exit (orDie)
-import           X.Options.Applicative
+import           X.Options.Applicative (Mod, Parser, Completer, CommandFields)
+import           X.Options.Applicative (SafeCommand(..), RunType(..))
+import           X.Options.Applicative (dispatch, subparser, safeCommand, command')
+import           X.Options.Applicative (hidden, short, long, flag, flag', help, value)
+import           X.Options.Applicative (metavar, argument, option, pOption, textRead)
+import           X.Options.Applicative (mkCompleter, completer)
 
 ------------------------------------------------------------------------
 -- Types
@@ -67,7 +80,7 @@ type SSHArg = Text
 
 data BoxCommandError =
     BoxError    BoxError
-  | BoxAwsError Error
+  | BoxAwsError Mismi.Error
   | BoxNoFilter
   | BoxNoMatches
   | BoxNoGateway
@@ -95,6 +108,10 @@ main = do
     Safe VersionCommand -> do
       prog <- getProgName
       putStrLn (prog <> ": " <> buildInfoVersion)
+      exitSuccess
+
+    Safe DependencyCommand -> do
+      mapM_ putStrLn dependencyInfo
       exitSuccess
 
     Safe (RunCommand r cmd) -> do
@@ -130,7 +147,7 @@ boxSSH runType gwType pType qTarget autoSSH args' boxes = do
     else goJump   target user ident -- ... unless target is a gateway
   where
     qGateway = Query ExactAll (Exact $ gatewayFlavour gwType) InfixAll ExactAll
-    randomGw = firstEitherT (\case
+    randomGw = firstT (\case
                    BoxNoMatches -> BoxNoGateway
                    e            -> e) $ randomBoxOfQuery qGateway boxes
     boxNiceName b  = unName (boxName b) <> "." <> unInstanceId (boxInstance b)
@@ -258,15 +275,15 @@ fetchBoxes :: Environment -> EitherT BoxCommandError IO [Box]
 fetchBoxes en = do
     -- We don't want people setting a default AWS region
     -- on their local machine, use Sydney instead.
-    mregion <- fmap (either (const Sydney) id) $ runEitherT getRegionFromEnv
-    env     <- newEnv mregion Discover
+    mregion <- fmap (either (const Sydney) id) $ runEitherT Mismi.getRegionFromEnv
+    env     <- Mismi.newEnv mregion Discover
     store   <- liftIO storeEnv
-    boxes   <- squash (runAWS env (readBoxes store en))
+    boxes   <- squash (Mismi.runAWS env (readBoxes store en))
     path    <- liftIO (cacheEnv en)
     liftIO $ whenM useCache (writeCache path (boxesToText boxes))
     return boxes
-    where squash x = bimapEitherT BoxError    id . hoistEither
-                 =<< bimapEitherT BoxAwsError id x
+    where squash x = firstT BoxError    . hoistEither
+                 =<< firstT BoxAwsError x
 
 useCache :: IO Bool
 useCache = (==) defaultBoxStore <$> storeEnv
@@ -282,7 +299,7 @@ selectHost ExternalHost = boxPublicHost
 
 boxCommandErrorRender :: BoxCommandError -> Text
 boxCommandErrorRender (BoxError e)          = boxErrorRender e
-boxCommandErrorRender (BoxAwsError e)       = renderError e
+boxCommandErrorRender (BoxAwsError e)       = Mismi.renderError e
 boxCommandErrorRender (BoxNoFilter)         = "No filter specified"
 boxCommandErrorRender (BoxNoMatches)        = "No matching boxes found"
 boxCommandErrorRender (BoxNoGateway)        = "No usable gateways found"
@@ -301,7 +318,7 @@ storeEnv =
     -- Grab BOX_STORE from $ENV if defined, try to parse it as S3
     let envStore = lookupEnv "BOX_STORE"
         tryS3 s = maybe (BoxStoreLocal s)
-                         BoxStoreS3 . addressFromText $ T.pack s
+                         BoxStoreS3 . Mismi.addressFromText $ T.pack s
     in  fmap (maybe defaultBoxStore tryS3) envStore
 
 userEnv :: IO Text
@@ -487,10 +504,10 @@ envCompleter = mkCompleter $ \arg -> do
         Nothing   -> do
           -- Head off to S3 or filesystem, write out the cache
           envs <- fmap (either (const []) id) $ do
-            mregion <- runEitherT getRegionFromEnv
-            awsEnv  <- newEnv (either (const Sydney) id mregion) Discover
+            mregion <- runEitherT Mismi.getRegionFromEnv
+            awsEnv  <- Mismi.newEnv (either (const Sydney) id mregion) Discover
             store   <- storeEnv
-            runEitherT $ runAWS awsEnv (listEnvironments store)
+            runEitherT $ Mismi.runAWS awsEnv (listEnvironments store)
           -- Only write out cache when permitted
           when useCache' (writeCache cacheFile (T.unlines envs))
           return envs

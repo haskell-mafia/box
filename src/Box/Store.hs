@@ -1,8 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms #-}
 module Box.Store (
-    module Mismi
-  , readBoxes
+    readBoxes
   , writeBoxes
   , listEnvironments
   , defaultBoxStore
@@ -10,20 +10,25 @@ module Box.Store (
 
 import           Box.Data
 
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Either
+import           Control.Monad.IO.Class (liftIO)
 
-import           Data.Text as T
-import           Data.Text.IO as T
+import qualified Data.Text as T
+import qualified Data.Text.IO as T
 
-import           Mismi as Mismi
-import           Mismi.S3 as Mismi hiding (runAWS, key)
-import           Mismi.Amazonka as Mismi hiding (runAWS, InstanceId, matchAll, parser, timeout)
+import           Mismi.Amazonka (AWS)
+import           Mismi.S3 (Address(..), Key(..), Bucket(..), WriteMode(..))
+import qualified Mismi.S3 as Mismi
 
 import           P
 
-import           System.Directory
-import           System.FilePath as FP
+import           System.Directory (getDirectoryContents, doesFileExist)
+import           System.FilePath ((</>), (<.>))
+import           System.FilePath (takeExtension, dropExtension)
+import           System.FilePath (takeFileName, dropFileName)
+import           System.FilePath (takeDirectory)
+
+import           X.Control.Monad.Trans.Either (pattern EitherT, runEitherT, hoistEither)
+
 
 readBoxes :: BoxStore -> Environment -> AWS (Either BoxError [Box])
 readBoxes bxs env = case boxStoreWithEnv bxs env of
@@ -46,8 +51,8 @@ listEnvironments bs = envNames bs
     envNames (BoxStoreLocal fp) = do
       paths <- liftIO $ getDirectoryContents (takeDirectory fp)
       return [ noSuffix p | p <- paths, validEnv p ]
-    envNames (BoxStoreS3 (Address b key)) = do
-      paths <- Mismi.list (Address b (dirname key))
+    envNames (BoxStoreS3 (Address b k)) = do
+      paths <- Mismi.list (Address b (Mismi.dirname k))
       return [ noSuffix x | p <- paths, let x = unpackKey p, validEnv x]
     noSuffix = T.pack . dropExtension . takeFileName
     validEnv = (== ".v2") . takeExtension
