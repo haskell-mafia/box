@@ -140,7 +140,61 @@ and I have the following in my `.zshrc`:
 fpath=($HOME/.config/zsh/completions $fpath)
 ```
 
-#### Ambiata App Shop
+### fzf
+
+[fzf](https://github.com/junegunn/fzf) is a general-purpose command-line
+fuzzy finder. Below are some shell scripts which allow you to use it to
+quickly select the environment and the instance.
+
+To install `fzf` on OS/X, you can use `brew`:
+```
+$ brew install fzf
+```
+
+#### Z Shell
+
+To integrate `fzf` with `box` on `zsh`, add the following to your `.zshrc`:
+
+```zsh
+fbox() {
+  BOX_ENVIRONMENT=$(box --bash-completion-index 2 --bash-completion-word box --bash-completion-word -e | fzf)
+  if [ ! -z "$BOX_ENVIRONMENT" ]; then
+    BOX_INSTANCE=$(box -e $BOX_ENVIRONMENT ls | tail -n +2 | fzf | awk '{print $1 ":" $2 "::" $6}')
+    if [ ! -z "$BOX_INSTANCE" ]; then
+      print -z "box -e $BOX_ENVIRONMENT ssh $BOX_INSTANCE"
+    fi
+  fi
+}
+```
+
+You can then use `fbox` to easily construct a `box ssh` command for
+connecting to a box.
+
+#### Bash
+
+To integrate `fzf` with `box` on `bash`, add the following to your `.bashrc` or `.bash_profile`:
+
+```bash
+fbox() {
+  BOX_ENVIRONMENT=$(box --bash-completion-index 2 --bash-completion-word box --bash-completion-word -e | fzf)
+  if [ ! -z "$BOX_ENVIRONMENT" ]; then
+    BOX_INSTANCE=$(box -e $BOX_ENVIRONMENT ls | tail -n +2 | fzf | awk '{print $1 ":" $2 "::" $6}')
+    if [ ! -z "$BOX_INSTANCE" ]; then
+      # add command to history so it can recalled quickly
+      eval "history -s \"box -e $BOX_ENVIRONMENT ssh $BOX_INSTANCE\""
+      # execute command
+      eval "box -e $BOX_ENVIRONMENT ssh $BOX_INSTANCE"
+    fi
+  fi
+}
+```
+
+This works slightly differently to the `zsh` integration because `bash`
+lacks the equivalent of `print -z`. Instead we manually add the command
+to the history, then execute the command, without giving the user
+a chance to edit it.
+
+### Ambiata App Shop
 
 It would be nice if we had a way to distribute these kind of auxiliary
 scripts as part of an `appshop-update`.
