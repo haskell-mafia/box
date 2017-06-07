@@ -7,8 +7,6 @@ module Test.IO.Box.Store where
 import           Box.Data
 import           Box.Store
 
-import           Mismi (AWS)
-
 import           P
 
 import           Test.Box.Arbitrary ()
@@ -16,21 +14,24 @@ import           Test.Mismi.S3 (testAWS, newFilePath, newAddress)
 import           Test.QuickCheck
 
 
-prop_readwrite_s3 bs = testAWS $ do
+prop_readwrite_s3 bs bs' = testAWS $ do
   path <- newAddress
-  writeReadBoxes bs . BoxStoreS3 $ path
+  path' <- newAddress
+  writeBoxes bs (BoxFileS3 path) DefaultEnv
+  writeBoxes bs' (BoxFileS3 path') DefaultEnv
+  bxs <- readBoxes (BoxStore [BoxFileS3 path, BoxFileS3 path']) DefaultEnv
+  pure $ bxs === Right (bs <> bs')
 
-prop_readwrite_local bs = testAWS $ do
+prop_readwrite_local bs bs' = testAWS $ do
   path <- newFilePath
-  writeReadBoxes bs . BoxStoreLocal . (<> "/file") $ path
-
-
-writeReadBoxes :: [Box] -> BoxStore -> AWS Property
-writeReadBoxes bs f = do
-  writeBoxes bs f DefaultEnv
-  bs' <- readBoxes f DefaultEnv
-  pure $ bs' === Right bs
-
+  path' <- newFilePath
+  let
+    lf = BoxFileLocal . (<> "/file") $ path
+    lf' = BoxFileLocal . (<> "/file") $ path'
+  writeBoxes bs lf DefaultEnv
+  writeBoxes bs' lf' DefaultEnv
+  bxs <- readBoxes (BoxStore [lf, lf']) DefaultEnv
+  pure $ bxs === Right (bs <> bs')
 
 return []
 tests = $forAllProperties $ quickCheckWithResult (stdArgs { maxSuccess = 10 })
