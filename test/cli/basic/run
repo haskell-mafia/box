@@ -61,6 +61,11 @@ EXPECT='ambiata'
 ACTUAL=$($BOX ls ambiata | tail -1 | awk '{print $1}' | head)
 check "$EXPECT" "$ACTUAL"
 
+# Note needs to stay at the end.
+EXPECT='Wile E. Coyote'
+ACTUAL=$($BOX ls acme | grep i-defaced0 | awk '{for(i=(NF-2);i<=NF;i++){printf "%s ", $i}; printf "\n"}' | xargs)
+check "$EXPECT" "$ACTUAL"
+
 EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@54.1.1.8 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@192.31.14.3"]'
 ACTUAL=$($BOX --dry-run ssh -s acme:lab)
 check "$EXPECT" "$ACTUAL"
