@@ -238,6 +238,9 @@ boxList q boxes = liftIO $ do
              <++> col PB.left  (unHost       . boxHost)
              <++> col PB.left  (unHost       . boxPublicHost)
              <++> col PB.left  (unInstanceId . boxInstance)
+             -- Note needs to stay at the end of the line; it is freeform
+             -- text and we don't want to accidentally break field splitting
+             -- with `awk` et cetera.
              <++> col PB.left  (unNote       . boxNote)
   where
     sorted       = sort (query q boxes)
