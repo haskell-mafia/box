@@ -33,7 +33,8 @@ import           System.Exit (exitSuccess)
 import           System.FilePath ((</>), (<.>), dropFileName)
 import           System.IO (IO, FilePath, BufferMode(..))
 import           System.IO (hClose, hFlush, hIsTerminalDevice, hSetBuffering)
-import           System.IO (stdout, stderr, putStrLn, print, openTempFile)
+import           System.IO (stdout, stderr, print, openTempFile)
+import           System.IO (putStrLn, hPutStrLn)
 import           System.Posix.Files (setFileMode, accessModes)
 import           System.Posix.Process (executeFile)
 import           System.Posix.User (getEffectiveUserName)
@@ -230,7 +231,7 @@ boxRSync env runType gwType qTarget args = do
 
 boxList :: Query -> [Box] -> EitherT BoxCommandError IO ()
 boxList q boxes = liftIO $ do
-    putStrLn ("total " <> show (length sorted))
+    hPutStrLn stderr ("total " <> show (length sorted))
 
     PB.printBox $ col PB.left  (unClient     . boxClient)
               <+> col PB.left  (unFlavour    . boxFlavour)
