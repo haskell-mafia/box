@@ -238,6 +238,7 @@ boxList q boxes = liftIO $ do
              <++> col PB.left  (unHost       . boxHost)
              <++> col PB.left  (unHost       . boxPublicHost)
              <++> col PB.left  (unInstanceId . boxInstance)
+             <++> col PB.left  (unNote       . boxNote)
   where
     sorted       = sort (query q boxes)
     col align f  = PB.vcat align (fmap (PB.text . T.unpack . f) sorted)
