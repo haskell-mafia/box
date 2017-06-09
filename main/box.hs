@@ -240,13 +240,20 @@ boxList q boxes = liftIO $ do
              <++> col PB.left  (unInstanceId . boxInstance)
              -- Note needs to stay at the end of the line; it is freeform
              -- text and we don't want to accidentally break field splitting
-             -- with `awk` et cetera.
-             <++> col PB.left  (unNote       . boxNote)
+             -- with `awk` et cetera. The quotes are just to aid humans
+             -- scanning the list.
+             <++> col PB.left  (quoteNote    . boxNote)
   where
     sorted       = sort (query q boxes)
     col align f  = PB.vcat align (fmap (PB.text . T.unpack . f) sorted)
 
     (<++>) l r = l PB.<> PB.emptyBox 0 2 PB.<> r
+
+quoteNote :: Note -> Text
+-- FIXME: why is this a Note and not a Maybe Note?
+quoteNote (Note "") = "-"
+quoteNote (Note "-") = "-"
+quoteNote (Note t) = T.concat ["\"", t, "\""]
 
 
 ------------------------------------------------------------------------
