@@ -113,16 +113,13 @@ EXPECT=$($BOX --environment altenv ls)
 ACTUAL=$($BOX -e altenv ls)
 check "$EXPECT" "$ACTUAL"
 
-ACTUAL=$($BOX ls -e altenv)
-check "$EXPECT" "$ACTUAL"
-
 # Test that bad env args don't run
 echo "Testing invalid environment arg..."
 EXPECT="Could not find the box file located at"
 ACTUAL=$($BOX -e badenv ls 2>&1 | cut -d':' -f1)
 check "$EXPECT" "$ACTUAL"
 
-ACTUAL=$($BOX ls --environment badenv 2>&1 | cut -d':' -f1)
+ACTUAL=$($BOX --environment badenv ls 2>&1 | cut -d':' -f1)
 check "$EXPECT" "$ACTUAL"
 
 # Test we get the correct set of values from altenv

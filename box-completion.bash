@@ -11,6 +11,7 @@
 _box()
 {
   local cur colonprefixes
+  local IFS=$'\n'
 
   COMPREPLY=()
   cur=${COMP_WORDS[COMP_CWORD]}
@@ -20,7 +21,7 @@ _box()
     CMDLINE=(${CMDLINE[@]} --bash-completion-word $arg)
   done
 
-  colonprefixes=${cur%"${cur##*:}"}
+  colonprefixes=${cur%"${cur##*[${COMP_WORDBREAKS}]}"}
   COMPREPLY=( $(box "${CMDLINE[@]}") )
 
   local i=${#COMPREPLY[*]}
