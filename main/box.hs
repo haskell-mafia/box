@@ -13,7 +13,7 @@ import           Box
 
 import           Control.Concurrent (threadDelay)
 import           Control.Concurrent.Async (race)
-import           Control.Exception (bracket)
+import           Control.Exception (bracket, catch, SomeException)
 import           Control.Monad.IO.Class (MonadIO(..))
 
 import           Data.List (sort)
@@ -260,13 +260,13 @@ boxList q boxes = liftIO $ do
 
 cachedBoxes :: Environment -> EitherT BoxCommandError IO [Box]
 cachedBoxes env = do
-  ifM (liftIO useCache) (fetchCache env) (fetchBoxes env) -- Skip cache when BOX_STORE set
+  ifM (liftIO useCache) fetchCache (fetchBoxes env) -- Skip cache when BOX_STORE set
   where
     timeout = 60 -- seconds
-    fetchCache env' = do
+    fetchCache = do
       path  <- liftIO (cacheEnv env)
       cache <- liftIO (readCache path timeout)
-      fromMaybeM (fetchBoxes env') (cache >>= rightToMaybe . boxesFromText)
+      fromMaybeM (fetchBoxes env) (cache >>= rightToMaybe . boxesFromText)
 
 
 fetchBoxes :: Environment -> EitherT BoxCommandError IO [Box]
@@ -551,8 +551,7 @@ envCompleter = mkCompleter $ \arg -> do
 --
 -- Interesting things:
 -- 1) We only consider calling the remote machine if the user starts
---    the path with a `:`, but, we offer a colon as a completion
---    otherwise.
+--    the path with a `:`.
 -- 2) We are calling @box ssh@ proper and passing the `ls` command
 --    with the argument followed by a globbing *.
 --    The flags ensure one item is printed per line, as is required
@@ -574,12 +573,12 @@ rsyncCompleter env gwType qTarget =
                         SomeEnv x -> ["-e ", x]
                         DefaultEnv -> []
               args' = envarg <> ["ssh"] <> secure <> [ queryRender qTarget, "--", "ls", "-aF1dL", T.pack arg <> "*", "2>/dev/null"]
-              box'  = readProcess box (fmap T.unpack args') []
+              box'  = readProcess box (fmap T.unpack args') [] `catch` (\(_ :: SomeException) -> return [] )
               limit = threadDelay 2000000 -- 2 seconds
             res <- race box' limit
             return $ either lines (\() -> []) res
     _
-      -> return [":"]
+      -> return []
 
 ------------------------------------------------------------------------
 -- Command Arguments
