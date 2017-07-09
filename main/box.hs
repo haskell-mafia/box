@@ -573,7 +573,7 @@ rsyncCompleter env gwType qTarget =
                         SomeEnv x -> ["-e ", x]
                         DefaultEnv -> []
               args' = envarg <> ["ssh"] <> secure <> [ queryRender qTarget, "--", "ls", "-aF1dL", T.pack arg <> "*", "2>/dev/null"]
-              box'  = readProcess box (fmap T.unpack args') [] `catch` (\(_ :: SomeException) -> return [] )
+              box'  = readProcess box (fmap T.unpack args') [] `catch` \(_ :: SomeException) -> return []
               limit = threadDelay 2000000 -- 2 seconds
             res <- race box' limit
             return $ either lines (\() -> []) res
