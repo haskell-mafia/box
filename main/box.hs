@@ -48,12 +48,12 @@ import qualified Text.PrettyPrint.Boxes as PB
 import           X.Control.Monad.Trans.Either (EitherT, runEitherT, left, hoistEither)
 import           X.Control.Monad.Trans.Either.Exit (orDie)
 import           X.Options.Applicative (Mod, Parser, Completer, CommandFields)
-import           X.Options.Applicative (SafeCommand(..), RunType(..))
+import           X.Options.Applicative (SafeCommand(..), RunType(..), ReadM)
 import           X.Options.Applicative (dispatch, subparser, safeCommand, command')
 import           X.Options.Applicative (hidden, short, long, flag, flag', help, value)
 import           X.Options.Applicative (metavar, argument, option, pOption, textRead)
-import           X.Options.Applicative (mkCompleter, completer, action)
-import           Options.Applicative.Types (fromM, oneM, manyM, readerAsk)
+import           X.Options.Applicative (mkCompleter, completer, action, readerError)
+import           Options.Applicative.Types (fromM, oneM, manyM)
 
 ------------------------------------------------------------------------
 -- Types
@@ -434,7 +434,7 @@ boxCommands e =
                 -- the help text for rsyncArgP. So add an unreachable
                 -- and unused parser to obtain an appropriate help
                 -- text.
-              ) <* many (argument readerAsk
+              ) <* many (argument (readerError "RSYNC unreachable argument encountered" :: ReadM ())
                            (metavar "RSYNC_ARGUMENTS" <> help "Extra arguments to pass to rsync." ))
             )
 
