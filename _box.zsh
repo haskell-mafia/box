@@ -34,7 +34,7 @@ else
     elif [[ $word[1] == "-" ]]; then
       # words starting with a dash (-) are
       # flags, so put them at the bottom
-      # instead of in the list     
+      # instead of in the list
       compadd                      -- $word
 
     else

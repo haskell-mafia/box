@@ -11,10 +11,13 @@ import           DependencyInfo_ambiata_box
 
 import           Box
 
-import           Control.Exception (bracket)
+import           Control.Concurrent (threadDelay)
+import           Control.Concurrent.Async (race)
+import           Control.Exception (bracket, catch, SomeException)
 import           Control.Monad.IO.Class (MonadIO(..))
 
 import           Data.List (sort)
+import           Data.String (lines)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
@@ -28,7 +31,7 @@ import           P
 
 import           System.Directory (createDirectoryIfMissing)
 import           System.Directory (getHomeDirectory, getTemporaryDirectory)
-import           System.Environment (lookupEnv, getArgs, getProgName, getExecutablePath)
+import           System.Environment (lookupEnv, getProgName, getExecutablePath)
 import           System.Exit (exitSuccess)
 import           System.FilePath ((</>), (<.>), dropFileName)
 import           System.IO (IO, FilePath, BufferMode(..))
@@ -37,6 +40,7 @@ import           System.IO (stdout, stderr, putStrLn, print, openTempFile)
 import           System.Posix.Files (setFileMode, accessModes)
 import           System.Posix.Process (executeFile)
 import           System.Posix.User (getEffectiveUserName)
+import           System.Process (readProcess)
 
 import           Text.PrettyPrint.Boxes ((<+>))
 import qualified Text.PrettyPrint.Boxes as PB
@@ -44,11 +48,12 @@ import qualified Text.PrettyPrint.Boxes as PB
 import           X.Control.Monad.Trans.Either (EitherT, runEitherT, left, hoistEither)
 import           X.Control.Monad.Trans.Either.Exit (orDie)
 import           X.Options.Applicative (Mod, Parser, Completer, CommandFields)
-import           X.Options.Applicative (SafeCommand(..), RunType(..))
+import           X.Options.Applicative (SafeCommand(..), RunType(..), ReadM)
 import           X.Options.Applicative (dispatch, subparser, safeCommand, command')
 import           X.Options.Applicative (hidden, short, long, flag, flag', help, value)
 import           X.Options.Applicative (metavar, argument, option, pOption, textRead)
-import           X.Options.Applicative (mkCompleter, completer)
+import           X.Options.Applicative (mkCompleter, completer, action, readerError)
+import           Options.Applicative.Types (fromM, oneM, manyM)
 
 ------------------------------------------------------------------------
 -- Types
@@ -57,7 +62,7 @@ data BoxCommand =
     BoxIP    Query HostType
   | BoxSSH   GatewayType ProcessType Query SSHType [SSHArg]
   | BoxRSH   GatewayType Query [SSHArg]
-  | BoxRSync GatewayType Query [SSHArg]
+  | BoxRSync GatewayType Query [RsyncArg]
   | BoxList  Query
   deriving (Eq, Show)
 
@@ -77,6 +82,7 @@ data ProcessType =
   deriving (Eq, Show)
 
 type SSHArg = Text
+type RsyncArg = Text
 
 data BoxCommandError =
     BoxError    BoxError
@@ -252,27 +258,15 @@ boxList q boxes = liftIO $ do
 ------------------------------------------------------------------------
 -- Utils
 
-cachedBoxes :: EitherT BoxCommandError IO [Box]
-cachedBoxes = do
-  env   <- liftIO getEnvFromArgs
-  ifM (liftIO useCache) (fetchCache env) (fetchBoxes env) -- Skip cache when BOX_STORE set
+cachedBoxes :: Environment -> EitherT BoxCommandError IO [Box]
+cachedBoxes env = do
+  ifM (liftIO useCache) fetchCache (fetchBoxes env) -- Skip cache when BOX_STORE set
   where
     timeout = 60 -- seconds
-    fetchCache env = do
+    fetchCache = do
       path  <- liftIO (cacheEnv env)
       cache <- liftIO (readCache path timeout)
       fromMaybeM (fetchBoxes env) (cache >>= rightToMaybe . boxesFromText)
-    getEnvFromArgs = do
-      args <- getArgs
-      return $ getEnvArgs (filter (/= "--bash-completion-word") args)
-    getEnvArgs = \case
-      -- Grab the -e / --environment arg from inside a Completer
-      -- Awful hack, but Applicative gives us no choice
-      ("-e":env:_)            -> SomeEnv (T.pack env)
-      ("--environment":env:_) -> SomeEnv (T.pack env)
-      ("--":_)                -> DefaultEnv
-      (_:xs)                  -> getEnvArgs xs
-      []                      -> DefaultEnv
 
 
 fetchBoxes :: Environment -> EitherT BoxCommandError IO [Box]
@@ -387,8 +381,24 @@ envCacheEnvFactoryBean = do
 ------------------------------------------------------------------------
 -- Argument Parsing
 
+--
+-- Monadic optparse over the environment so that
+-- bash completion scripts can use the right env
+-- when completing box ids amongst other things.
+--
+-- Requires optparse-applicative 0.14 in order to
+-- "see through" the bind during help text generation
+-- (which is possible as we have a default environment).
+--
+-- This means that the environment must come first
+-- on the command line (but that was pretty much the
+-- case anyway, as it's the only option before the
+-- subcommands start).
 boxP :: Parser (Environment, CompCommands BoxCommand)
-boxP = (,) <$> envP <*> commandsP boxCommands
+boxP = fromM $ do
+  e <- oneM envP
+  c <- oneM $ commandsP (boxCommands e)
+  return (e,c)
 
 envP :: Parser Environment
 envP = option readEnv $
@@ -400,24 +410,39 @@ envP = option readEnv $
   <> value DefaultEnv
   where readEnv = SomeEnv <$> textRead
 
-boxCommands :: [Command BoxCommand]
-boxCommands =
+boxCommands :: Environment -> [Command BoxCommand]
+boxCommands e =
   [ Command "ip"  "Get the IP address of a box."
-            (BoxIP    <$> queryP <*> hostTypeP)
+            (BoxIP   <$> queryP e <*> hostTypeP)
 
   , Command "ssh" "SSH to a box."
-            (BoxSSH   <$> gatewayP <*> backGroundP <*> queryP <*> autoP <*> many sshArgP)
+            (BoxSSH  <$> gatewayP <*> backGroundP <*> queryP e <*> autoP <*> many sshArgP)
 
   , Command "rsh" "SSH to a box with a shell interface compatible with rsync."
-            (BoxRSH   <$> gatewayP <*> queryP <*> many sshArgP )
+            (BoxRSH  <$> gatewayP <*> queryP e <*> many sshArgP )
 
   , Command "rsync" "Invoke rsync via box."
-            (BoxRSync <$> gatewayP <*> queryP <*> many sshArgP)
+            (rsyncP e)
 
   , Command "ls"  "List available boxes."
-            (BoxList  <$> (queryP <|> pure matchAll))
-
+            (BoxList <$> (queryP e <|> pure matchAll))
   ]
+
+rsyncP :: Environment -> Parser BoxCommand
+rsyncP e =
+  --
+  -- Monadic style so we can complete remote files.
+  let m = do (g,q) <- oneM  $ (,) <$> gatewayP <*> queryP e
+             rs    <- manyM $ rsyncArgP e g q
+             return $ BoxRSync g q rs
+  --
+  -- We can't see through the above bind as queryP
+  -- doesn't have a default; meaning we can't generate
+  -- the help text for rsyncArgP. So add an unreachable
+  -- and unused parser to obtain an appropriate help
+  -- text.
+  in fromM m <* many (argument (readerError "RSYNC unreachable argument encountered" :: ReadM ())
+                        (metavar "RSYNC_ARGUMENTS" <> help "Extra arguments to pass to rsync." ))
 
 hostTypeP :: Parser HostType
 hostTypeP =
@@ -439,11 +464,11 @@ gatewayP =
     <> short 's'
     <> help "Use a 2FA-enabled gateway."
 
-queryP :: Parser Query
-queryP =
+queryP :: Environment -> Parser Query
+queryP e =
   argument (pOption queryParser) $
        metavar "FILTER"
-    <> completer filterCompleter
+    <> completer (filterCompleter e)
     <> help "Filter using the following syntax: CLIENT[:FLAVOUR[:NAME[:INSTANCE-ID]]]"
 
 matchAll :: Query
@@ -455,12 +480,19 @@ sshArgP =
        metavar "SSH_ARGUMENTS"
     <> help "Extra arguments to pass to ssh."
 
+rsyncArgP :: Environment -> GatewayType -> Query -> Parser RsyncArg
+rsyncArgP e g q =
+  argument textRead $
+       metavar "RSYNC_ARGUMENTS"
+    <> help "Extra arguments to pass to ssh."
+    <> action "file"
+    <> completer (rsyncCompleter e g q)
+
 backGroundP :: Parser ProcessType
 backGroundP =
   flag ForeGround BackGround $
      short 'b'
   <> help "Run in the background."
-
 
 setupAutoSSHArgs :: SSHType -> ProcessType -> [SSHArg] -> ([SSHArg], [SSHArg])
 setupAutoSSHArgs autoSSH pType sshArgs =
@@ -483,14 +515,14 @@ setupAutoSSHArgs autoSSH pType sshArgs =
       (AutoSSH, BackGround) ->
         (["-f"] <> autoSSHArgs, sshArgs)
 
-filterCompleter :: Completer
-filterCompleter = mkCompleter $ \arg -> do
+filterCompleter :: Environment -> Completer
+filterCompleter e = mkCompleter $ \arg -> do
     boxes <- tryFetchBoxes
     return . fmap T.unpack
            $ completions (T.pack arg) boxes
   where
     tryFetchBoxes :: IO [Box]
-    tryFetchBoxes = either (const []) id <$> runEitherT cachedBoxes
+    tryFetchBoxes = either (const []) id <$> runEitherT (cachedBoxes e)
 
 envCompleter :: Completer
 envCompleter = mkCompleter $ \arg -> do
@@ -515,6 +547,42 @@ envCompleter = mkCompleter $ \arg -> do
           -- Only write out cache when permitted
           when useCache' (writeCache cacheFile (T.unlines envs))
           return envs
+
+--
+-- Completion of remote file names.
+--
+-- Interesting things:
+-- 1) We only consider calling the remote machine if the user starts
+--    the path with a `:`.
+-- 2) We are calling @box ssh@ proper and passing the `ls` command
+--    with the argument followed by a globbing *.
+--    The flags ensure one item is printed per line, as is required
+--    for the completion script. We suppress stderr, as we don't want
+--    to complete with a "No such file or directory" message.
+-- 3) We have an async race as a timeout. This ensures that if there
+--    isn't a connection, we don't hang the shell (for more than 2s).
+--    If we used @exec@ instead of @readProcess@ then we couldn't
+--    call cancel as the executed programs would take full control.
+rsyncCompleter :: Environment -> GatewayType -> Query -> Completer
+rsyncCompleter env gwType qTarget =
+  mkCompleter $ \case
+    -- We're searching remotely
+    ':' : arg
+      -> do box <- getExecutablePath
+            let
+              secure = if gwType == GatewaySecure then ["--secure"] else []
+              envarg = case env of
+                        SomeEnv x -> ["-e ", x]
+                        DefaultEnv -> []
+              args' = envarg <> ["ssh"] <> secure <> [ queryRender qTarget, "--", "ls", "-aF1dL", T.pack arg <> "*", "2>/dev/null"]
+              box'  = readProcess box (fmap T.unpack args') [] `catch` \(_ :: SomeException) -> return []
+              limit = threadDelay 2000000 -- 2 seconds
+            res <- race box' limit
+            return $ either prefixedlines (\() -> []) res
+    _
+      -> return []
+  where
+    prefixedlines = fmap (':':) . lines
 
 ------------------------------------------------------------------------
 -- Command Arguments
