@@ -3,6 +3,14 @@ box
 
 Querying and configuration-free ssh access to servers.
 
+### Non Ambiata Note
+
+There are Ambiata specific defaults that need to be improved
+[#79](https://github.com/ambiata/box/issues/79), until then, this
+project is useful in its current form via a local configuration file
+(specified via BOX_FILE).
+
+
 ### Usage
 
 ```
@@ -193,8 +201,3 @@ This works slightly differently to the `zsh` integration because `bash`
 lacks the equivalent of `print -z`. Instead we manually add the command
 to the history, then execute the command, without giving the user
 a chance to edit it.
-
-### Ambiata App Shop
-
-It would be nice if we had a way to distribute these kind of auxiliary
-scripts as part of an `appshop-update`.
