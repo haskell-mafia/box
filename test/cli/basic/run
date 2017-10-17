@@ -66,22 +66,22 @@ EXPECT='Wile E. Coyote'
 ACTUAL=$($BOX ls acme | grep i-defaced0 | awk '{for(i=(NF-2);i<=NF;i++){printf "%s ", $i}; printf "\n"}' | xargs)
 check "$EXPECT" "$ACTUAL"
 
-EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@54.1.1.8 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@192.31.14.3"]'
-ACTUAL=$($BOX --dry-run ssh -s acme:lab)
+EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@54.1.1.6 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@192.31.14.3"]'
+ACTUAL=$($BOX --dry-run ssh acme:lab)
 check "$EXPECT" "$ACTUAL"
 
-EXPECT='["autossh","-M","0","-o","ServerAliveInterval 30","-o","ServerAliveCountMax 3","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@54.1.1.8 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@192.31.14.3"]'
-ACTUAL=$($BOX --dry-run ssh --auto -s acme:lab)
+EXPECT='["autossh","-M","0","-o","ServerAliveInterval 30","-o","ServerAliveCountMax 3","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@54.1.1.6 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@192.31.14.3"]'
+ACTUAL=$($BOX --dry-run ssh --auto acme:lab)
 check "$EXPECT" "$ACTUAL"
 
 # running box ssh in the background - pass -f as an ssh arg
-EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@54.1.1.8 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@192.31.14.3","-f"]'
-ACTUAL=$($BOX --dry-run ssh -b -s acme:lab)
+EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@54.1.1.6 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@192.31.14.3","-f"]'
+ACTUAL=$($BOX --dry-run ssh -b acme:lab)
 check "$EXPECT" "$ACTUAL"
 
 # with --auto, pass -f to autossh instead
-EXPECT='["autossh","-f","-M","0","-o","ServerAliveInterval 30","-o","ServerAliveCountMax 3","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@54.1.1.8 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@192.31.14.3"]'
-ACTUAL=$($BOX --dry-run ssh --auto -b -s acme:lab)
+EXPECT='["autossh","-f","-M","0","-o","ServerAliveInterval 30","-o","ServerAliveCountMax 3","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@54.1.1.6 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@192.31.14.3"]'
+ACTUAL=$($BOX --dry-run ssh --auto -b acme:lab)
 check "$EXPECT" "$ACTUAL"
 
 EXPECT='["ssh","-i","'$BOX_IDENTITY'","-o","UserKnownHostsFile='$BOX_KNOWN_HOSTS'","'$BOX_USER'@54.1.1.6"]'
@@ -140,15 +140,9 @@ echo $CMD
 ACTUAL=$($CMD)
 check "$EXPECT" "$ACTUAL"
 
-# Test ssh and ssh -s finds correct params from correct env
+# Test ssh finds correct params from correct env
 CMD="$BOX -e altenv --dry-run ssh ambiata:totp:asg.totp.helium.blargho"
 EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@54.22.33.6 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@172.131.22.14"]'
-echo $CMD
-ACTUAL=$($CMD)
-check "$EXPECT" "$ACTUAL"
-
-CMD="$BOX -e altenv --dry-run ssh -s ambiata:totp:asg.totp.helium.blargho"
-EXPECT='["ssh","-o","ProxyCommand=ssh -i '$BOX_IDENTITY' -o UserKnownHostsFile=/tmp/box_test_known_hosts '$BOX_USER'@152.65.153.178 nc %h %p 2>/dev/null","-o","UserKnownHostsFile=/tmp/box_test_known_hosts","'$BOX_USER'@172.131.22.14"]'
 echo $CMD
 ACTUAL=$($CMD)
 check "$EXPECT" "$ACTUAL"
