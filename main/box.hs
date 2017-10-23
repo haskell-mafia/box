@@ -55,9 +55,9 @@ import           X.Options.Applicative (mkCompleter, completer)
 
 data BoxCommand =
     BoxIP    Query HostType
-  | BoxSSH   GatewayType ProcessType Query SSHType [SSHArg]
-  | BoxRSH   GatewayType Query [SSHArg]
-  | BoxRSync GatewayType Query [SSHArg]
+  | BoxSSH   ProcessType Query SSHType [SSHArg]
+  | BoxRSH   Query [SSHArg]
+  | BoxRSync Query [SSHArg]
   | BoxList  Query
   deriving (Eq, Show)
 
@@ -117,9 +117,9 @@ main = do
     Safe (RunCommand r cmd) -> do
       case cmd of
         BoxIP     q host   -> runCommand env (boxIP  r q host)
-        BoxSSH    g p q a args -> runCommand env (boxSSH r g p q a args)
-        BoxRSH    g q args -> runCommand env (boxRSH r g q args)
-        BoxRSync  g q args -> runCommand env (const $ boxRSync env r g q args)
+        BoxSSH    p q a args -> runCommand env (boxSSH r p q a args)
+        BoxRSH    q args -> runCommand env (boxRSH r q args)
+        BoxRSync  q args -> runCommand env (const $ boxRSync env r q args)
         BoxList   q        -> runCommand env (boxList q)
 
 runCommand :: Environment -> ([Box] -> EitherT BoxCommandError IO ()) -> IO ()
@@ -137,8 +137,8 @@ boxIP _ q hostType boxes = do
   b <- randomBoxOfQuery q boxes
   liftIO (putStrLn . T.unpack . unHost . selectHost hostType $ b)
 
-boxSSH :: RunType -> GatewayType -> ProcessType -> Query -> SSHType -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
-boxSSH runType gwType pType qTarget autoSSH args' boxes = do
+boxSSH :: RunType -> ProcessType -> Query -> SSHType -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
+boxSSH runType pType qTarget autoSSH args' boxes = do
   target  <- randomBoxOfQuery qTarget  boxes
   user    <- liftIO userEnv
   ident   <- liftIO identityEnv
@@ -146,7 +146,7 @@ boxSSH runType gwType pType qTarget autoSSH args' boxes = do
     then goDirect target user ident -- Use proxy
     else goJump   target user ident -- ... unless target is a gateway
   where
-    qGateway = Query ExactAll (Exact $ gatewayFlavour gwType) InfixAll ExactAll
+    qGateway = Query ExactAll (Exact . Flavour $ "gateway") InfixAll ExactAll
     randomGw = firstT (\case
                    BoxNoMatches -> BoxNoGateway
                    e            -> e) $ randomBoxOfQuery qGateway boxes
@@ -203,25 +203,24 @@ boxSSH runType gwType pType qTarget autoSSH args' boxes = do
           AutoSSH ->
             liftIO (exec "autossh" (autoSSHArgs <> args''))
 
-boxRSH :: RunType -> GatewayType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
-boxRSH runType gwType qTarget args boxes = do
+boxRSH :: RunType -> Query -> [SSHArg] -> [Box] -> EitherT BoxCommandError IO ()
+boxRSH runType qTarget args boxes = do
   case args of
     [] ->
       left BoxMissingRSHHost
     ("":xs) ->
-      boxSSH runType gwType ForeGround qTarget PlainSSH xs boxes
+      boxSSH runType ForeGround qTarget PlainSSH xs boxes
     (h:_) ->
       left $ BoxInvalidRSHHost h
 
-boxRSync :: Environment -> RunType -> GatewayType -> Query -> [SSHArg] -> EitherT BoxCommandError IO ()
-boxRSync env runType gwType qTarget args = do
+boxRSync :: Environment -> RunType -> Query -> [SSHArg] -> EitherT BoxCommandError IO ()
+boxRSync env runType qTarget args = do
   box <- liftIO getExecutablePath
   let
-    secure = if gwType == GatewaySecure then "--secure" else ""
     envarg = case env of
                SomeEnv x -> "-e " <> x
                DefaultEnv -> ""
-    args' = [ "--rsh", T.intercalate " " [T.pack box, envarg, "rsh", secure, queryRender qTarget, "--"]] <> args
+    args' = [ "--rsh", T.intercalate " " [T.pack box, envarg, "rsh", queryRender qTarget, "--"]] <> args
   case runType of
     DryRun  ->
       liftIO (print ("rsync" : args'))
@@ -406,13 +405,13 @@ boxCommands =
             (BoxIP    <$> queryP <*> hostTypeP)
 
   , Command "ssh" "SSH to a box."
-            (BoxSSH   <$> gatewayP <*> backGroundP <*> queryP <*> autoP <*> many sshArgP)
+            (BoxSSH   <$> backGroundP <*> queryP <*> autoP <*> many sshArgP)
 
   , Command "rsh" "SSH to a box with a shell interface compatible with rsync."
-            (BoxRSH   <$> gatewayP <*> queryP <*> many sshArgP )
+            (BoxRSH   <$> queryP <*> many sshArgP )
 
   , Command "rsync" "Invoke rsync via box."
-            (BoxRSync <$> gatewayP <*> queryP <*> many sshArgP)
+            (BoxRSync <$> queryP <*> many sshArgP)
 
   , Command "ls"  "List available boxes."
             (BoxList  <$> (queryP <|> pure matchAll))
@@ -431,13 +430,6 @@ autoP =
        long "auto"
     <> short 'a'
     <> help "Use autossh. (Requires autossh to be installed locally)"
-
-gatewayP :: Parser GatewayType
-gatewayP =
-  flag Gateway GatewaySecure $
-       long "secure"
-    <> short 's'
-    <> help "Use a 2FA-enabled gateway."
 
 queryP :: Parser Query
 queryP =

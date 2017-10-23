@@ -114,16 +114,6 @@ both local and remote ends of the tunnel.
 box ssh vapour:dev:fozzie -- -L 8787:localhost:8787
 ```
 
-#### Secure SSH via TOTP
-
-```
-box ssh [-s|--secure] [filter]
-```
-
-Note: The flag needs to come after the `ssh` parameter. Order matters.
-
-[More information on SSH 2-Factor-Authentication](https://github.com/ambiata/architecture/blob/master/operations/ssh-2fa.md)
-
 ### Completion Support
 
 #### Bash
