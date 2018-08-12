@@ -310,13 +310,16 @@ exec cmd args = executeFile (T.unpack cmd) True (fmap T.unpack args) Nothing
 ------------------------------------------------------------------------
 -- Environment Variables
 
+-- Grab BOX_STORE from $ENV if defined and try to parse it:
+-- 1. split on comma
+-- 2. try to parse each element as an s3 Address, fall back to local file
 storeEnv :: IO BoxStore
 storeEnv =
-    -- Grab BOX_STORE from $ENV if defined, try to parse it as S3
-    let envStore = lookupEnv "BOX_STORE"
-        tryS3 s = maybe (BoxStoreLocal s)
-                         BoxStoreS3 . Mismi.addressFromText $ T.pack s
-    in  fmap (maybe defaultBoxStore tryS3) envStore
+  with (lookupEnv "BOX_STORE") $ \envStore ->
+    maybe defaultBoxStore (BoxStore . fmap tryS3 . T.splitOn "," . T.pack) envStore
+    where
+      tryS3 s = maybe (BoxFileLocal $ T.unpack s)
+        BoxFileS3 $ Mismi.addressFromText s
 
 userEnv :: IO Text
 userEnv =

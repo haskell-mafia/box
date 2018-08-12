@@ -6,6 +6,7 @@
 module Box.Data (
     Box (..)
   , BoxStore (..)
+  , BoxFile (..)
   , Query (..)
   , Exact (..)
   , Infix (..)
@@ -72,9 +73,13 @@ data Box =
     , boxNote       :: Note
     } deriving (Eq, Ord, Show)
 
-data BoxStore =
-    BoxStoreLocal FilePath
-  | BoxStoreS3 Address
+data BoxStore = BoxStore {
+    unBoxFiles :: [BoxFile]
+  } deriving (Eq, Show)
+
+data BoxFile =
+    BoxFileLocal FilePath
+  | BoxFileS3 Address
   deriving (Eq, Show)
 
 data Query = Query {
@@ -160,7 +165,7 @@ newtype Note =
   } deriving (Eq, Ord, Show)
 
 data BoxError =
-    BoxNotFound BoxStore
+    BoxFileNotFound BoxFile
   | BoxParseError Text
   deriving (Eq, Show)
 
@@ -311,15 +316,15 @@ boxParser = do
   endOfInput
   pure $ Box c f n i h p ctx is tz im az lc hk pr nt
 
-boxStoreRender :: BoxStore -> Text
-boxStoreRender (BoxStoreLocal f) =
+boxFileRender :: BoxFile -> Text
+boxFileRender (BoxFileLocal f) =
   T.pack f
-boxStoreRender (BoxStoreS3 a) =
+boxFileRender (BoxFileS3 a) =
   addressToText a
 
 boxErrorRender :: BoxError -> Text
-boxErrorRender (BoxNotFound bs) =
-  "Could not find the box file located at: " <> boxStoreRender bs
+boxErrorRender (BoxFileNotFound bs) =
+  "Could not find the box file located at: " <> boxFileRender bs
 boxErrorRender (BoxParseError e) =
   "Error parsing box file with the following error: " <> e
 
